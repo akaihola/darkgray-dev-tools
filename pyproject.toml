@@ -8,7 +8,7 @@ authors = [{name = "Antti Kaihola", email = "13725+akaihola@users.noreply.github
 dynamic = ["version", "description"]
 dependencies = [
     "click",
-    "ruamel.yaml",
+    "ruamel.yaml>=0.15.78",
     "setuptools>=61",
 ]
 

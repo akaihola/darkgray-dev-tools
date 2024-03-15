@@ -53,7 +53,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import click
-import ruamel.yaml
+from ruamel.yaml import YAML
 
 from darkgray_dev_tools.changelog import patch_changelog
 from darkgray_dev_tools.version_replace import do_replacements, get_replacements
@@ -69,7 +69,8 @@ def bump_version(  # pylint: disable=too-many-locals
 ) -> None:
     """Bump the version number."""
     with Path("release_tools/bump-version-patterns.yaml").open() as pattern_file:
-        pattern_templates_for_files = ruamel.yaml.safe_load(pattern_file)
+        yaml = YAML(typ="safe", pure=True)
+        pattern_templates_for_files = yaml.load(pattern_file)
     (patterns, replacements, new_version) = get_replacements(
         pattern_templates_for_files,
         increment_major=increment_major,
