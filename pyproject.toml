@@ -9,6 +9,7 @@ dynamic = ["version", "description"]
 dependencies = [
     "click",
     "ruamel.yaml",
+    "setuptools>=61",
 ]
 
 [project.urls]
