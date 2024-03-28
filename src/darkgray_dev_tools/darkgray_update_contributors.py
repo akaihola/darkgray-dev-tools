@@ -4,10 +4,12 @@
 
 Usage::
 
-    python release_tools/update_contributors.py generate \
+    pip install darkgray-dev-tools
+    darkgray-update-contributors \
         --token=<ghp_your_github_token> \
         --modify-readme \
         --modify-contributors
+    darkgray-verify-contributors
 
 """
 
@@ -16,9 +18,10 @@ Usage::
 import re
 import xml.etree.ElementTree as ET  # nosec
 from dataclasses import dataclass
-from functools import total_ordering
+from functools import total_ordering, lru_cache
 from itertools import groupby
 from pathlib import Path
+from subprocess import run
 from textwrap import dedent, indent
 from typing import Any, Dict, Iterable, List, MutableMapping, Optional, TypedDict, cast
 
@@ -76,6 +79,21 @@ def verify_contribution_type(url: str, contribution_type: str, *args: str) -> No
         )
 
 
+@lru_cache(maxsize=1)
+def get_github_repository() -> str:
+    """Get the name of the GitHub repository from the current directory.
+
+    :return: The name of the GitHub repository, including the owner
+
+    """
+    # Call `git remote get-url origin` to get the URL of the `origin` remote.
+    # Then extract the repository name from the URL.
+    result = run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError("Could not determine the GitHub repository name")
+    return result.stdout.split(":")[-1].split(".")[0]
+
+
 @cli.command()
 def verify() -> None:
     """Verify generated contributor table HTML in `README.rst`
@@ -83,6 +101,8 @@ def verify() -> None:
     Output the corresponding YAML source.
 
     """
+    repo = get_github_repository()
+    repo_name = repo.split("/")[1]
     root = _load_contributor_table(Path("README.rst"))
     users = {}
     for td_user in root.findall("tr/td"):
@@ -99,34 +119,45 @@ def verify() -> None:
                 raise RuntimeError(f"{url} is not a valid GitHub URL")
             path = url[19:]
             contribution_type = contribution_link.attrib["title"]
-            if path.startswith("akaihola/darker/issues?q=author%3A"):
+            if path.startswith(f"{repo}/issues?q=author%3A"):
                 verify_contribution_type(url, contribution_type, "Bug reports")
                 link_type = "issues"
-            elif path.startswith("akaihola/darker/commits?author="):
+            elif path.startswith(f"{repo}/commits?author="):
                 verify_contribution_type(
                     url, contribution_type, "Code", "Documentation", "Maintenance"
                 )
                 link_type = "commits"
-            elif path.startswith("akaihola/darker/pulls?q=is%3Apr+reviewed-by%3A"):
+            elif path.startswith(f"{repo}/pulls?q=is%3Apr+reviewed-by%3A"):
                 verify_contribution_type(
                     url, contribution_type, "Reviewed Pull Requests"
                 )
                 link_type = "pulls-reviewed"
-            elif path.startswith("akaihola/darker/pulls?q=is%3Apr+author%3A"):
+            elif path.startswith(f"{repo}/pulls?q=is%3Apr+author%3A"):
                 verify_contribution_type(
                     url, contribution_type, "Code", "Documentation"
                 )
                 link_type = "pulls-author"
-            elif path.startswith("akaihola/darker/search?q="):
+            elif path.startswith(f"{repo}/search?q=commenter"):
+                verify_contribution_type(
+                    url, contribution_type, "Bug reports", "Reviewed Pull Requests"
+                )
+                link_type = "search-comments"
+            elif path.startswith(f"{repo}/search?q="):
                 verify_contribution_type(
                     url, contribution_type, "Bug reports", "Answering Questions"
                 )
                 link_type = "search"
+            elif path.startswith(f"{repo}/discussions?discussions_q="):
+                verify_contribution_type(url, contribution_type, "Bug reports")
+                link_type = "search-discussions"
             elif path.startswith(
-                "conda-forge/staged-recipes/search?q=darker&type=issues&author="
+                f"conda-forge/staged-recipes/search?q={repo_name}&type=issues&author="
             ):
                 verify_contribution_type(url, contribution_type, "Code")
                 link_type = "conda-issues"
+            elif path.startswith(f"conda-forge/{repo_name}-feedstock/search?q="):
+                verify_contribution_type(url, contribution_type, "Code")
+                link_type = "feedstock-issues"
             else:
                 raise AssertionError((username, path, contribution_type))
             contributions.append({"type": contribution_type, "link_type": link_type})
@@ -143,20 +174,19 @@ CONTRIBUTION_SYMBOLS = {
     "Maintenance": "🚧",
 }
 CONTRIBUTION_LINKS = {
-    "issues": "akaihola/darker/issues?q=author%3A{username}",
-    "commits": "akaihola/darker/commits?author={username}",
-    "pulls-reviewed": "akaihola/darker/pulls?q=is%3Apr+reviewed-by%3A{username}",
-    "pulls-author": "akaihola/darker/pulls?q=is%3Apr+author%3A{username}",
-    "search": "akaihola/darker/search?q={username}",
-    "search-comments": "akaihola/darker/search?q=commenter%3A{username}&type=issues",
-    "search-discussions": (
-        "akaihola/darker/discussions?discussions_q=author%3A{username}"
-    ),
+    "issues": "{repo}/issues?q=author%3A{{username}}",
+    "commits": "{repo}/commits?author={{username}}",
+    "pulls-reviewed": "{repo}/pulls?q=is%3Apr+reviewed-by%3A{{username}}",
+    "pulls-author": "{repo}/pulls?q=is%3Apr+author%3A{{username}}",
+    "search": "{repo}/search?q={{username}}",
+    "search-comments": "{repo}/search?q=commenter%3A{{username}}&type=issues",
+    "search-discussions": "{repo}/discussions?discussions_q=author%3A{{username}}",
     "conda-issues": (
-        "conda-forge/staged-recipes/search?q=darker&type=issues&author={username}"
+        "conda-forge/staged-recipes/search?q={repo_name}&type=issues&author={{username}}"
     ),
-    "darker-feedstock-issues": (
-        "conda-forge/darker-feedstock/search?q=darker+author%3A{username}&type=issues"
+    "feedstock-issues": (
+        "conda-forge/{repo_name}-feedstock/search"
+        "?q={repo_name}+author%3A{{username}}&type=issues"
     ),
 }
 
@@ -225,7 +255,7 @@ ALL_CONTRIBUTORS_END = "   <!-- ALL-CONTRIBUTORS-LIST:END -->"
 @click.option("--token")
 @click.option("-r/+r", "--modify-readme/--no-modify-readme", default=False)
 @click.option("-c/+c", "--modify-contributors/--no-modify-contributors", default=False)
-def generate(token: str, modify_readme: bool, modify_contributors: bool) -> None:
+def update(token: str, modify_readme: bool, modify_contributors: bool) -> None:
     """Generate an HTML table for `README.rst` and a list for `CONTRIBUTORS.rst`
 
     These contributor lists are generated based on `contributors.yaml`.
@@ -265,7 +295,10 @@ class Contribution:
         :return: A URL link to a GitHub search
 
         """
-        link_template = CONTRIBUTION_LINKS[self.link_type]
+        link_template = CONTRIBUTION_LINKS[self.link_type].format(
+            repo=get_github_repository(),
+            repo_name=get_github_repository().split("/")[1],
+        )
         return f"https://github.com/{link_template}".format(username=login)
 
 
@@ -280,7 +313,7 @@ class GitHubUser(TypedDict):
 @dataclass
 @total_ordering
 class Contributor:
-    """GitHub user information coupled with a list of Darker contributions"""
+    """GitHub user information coupled with a list of repository contributions"""
 
     user_id: int
     name: Optional[str]
@@ -342,11 +375,11 @@ def join_github_users_with_contributions(
     users_and_contributions: Dict[str, List[Contribution]],
     session: GitHubSession,
 ) -> List[Contributor]:
-    """Join GitHub user information with their Darker contributions
+    """Join GitHub user information with their repository contributions
 
-    :param users_and_contributions: GitHub user logins and their Darker contributions
+    :param users_and_contributions: GitHub logins and their repository contributions
     :param session: A GitHub API HTTP session
-    :return: GitHub user information and the user's darker contributions merged together
+    :return: GitHub user info and the user's repository contributions merged together
 
     """
     users: List[Contributor] = []
@@ -387,7 +420,7 @@ def make_rows(users: List[Contributor], columns: int) -> List[List[Contributor]]
 def render_html(users: List[Contributor]) -> Airium:
     """Convert users and contributions into an HTML table for `README.rst`
 
-    :param users: GitHub user records and the users' contributions to Darker
+    :param users: GitHub user records and the users' contributions to the repository
     :return: An Airium document describing the HTML table
 
     """
@@ -450,12 +483,14 @@ def write_contributors(text: str) -> None:
     :param text: The generated list of contributors using reStructuredText markup
 
     """
+    project = get_github_repository().split("/")[1].title()
+    eqsigns = "=" * len(project)
     Path("CONTRIBUTORS.rst").write_text(
         dedent(
-            """\
-            ========================
-             Contributors to Darker
-            ========================
+            f"""\
+            ================={eqsigns}=
+             Contributors to {project}
+            ================={eqsigns}=
 
             (in alphabetic order and with GitHub handles)
 
@@ -463,7 +498,7 @@ def write_contributors(text: str) -> None:
                instead and see ``CONTRIBUTING.rst`` for instructions on how to update
                this file.
 
-            {}
+            {{}}
             """
         ).format(text),
         encoding="utf-8",

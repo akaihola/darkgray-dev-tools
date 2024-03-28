@@ -20,6 +20,8 @@ Home = "https://github.com/akaihola/darkgray-dev-tools"
 
 [project.scripts]
 darkgray_bump_version = "darkgray_dev_tools.darkgray_bump_version:bump_version"
+darkgray_verify_contributors = "darkgray_dev_tools.darkgray_update_contributors:verify"
+darkgray_update_contributors = "darkgray_dev_tools.darkgray_update_contributors:update"
 
 [tool.black]
 line-length = 88
