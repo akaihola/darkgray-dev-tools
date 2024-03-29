@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-"""Helper script for templating contributor lists in `README` and `CONTRIBUTORS.rst`
+"""Helper script for templating contributor lists in ``README`` and ``CONTRIBUTORS``.
 
 Usage::
 
@@ -15,45 +13,62 @@ Usage::
 
 # pylint: disable=too-few-public-methods,abstract-method
 
+from __future__ import annotations
+
 import re
-import xml.etree.ElementTree as ET  # nosec
 from dataclasses import dataclass
-from functools import total_ordering, lru_cache
+from functools import lru_cache, total_ordering
 from itertools import groupby
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent, indent
-from typing import Any, Dict, Iterable, List, MutableMapping, Optional, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, TypedDict, cast
+from xml.etree import ElementTree  # nosec
 
 import click
 import defusedxml.ElementTree
 from airium import Airium
-from requests.models import Response
+from requests import codes
 from requests_cache.session import CachedSession
 from ruamel import yaml
+
+from darkgray_dev_tools.exceptions import (
+    GitHubApiError,
+    GitHubApiNotFoundError,
+    GitHubRepoNameError,
+    InvalidGitHubUrlError,
+    SectionNotFoundError,
+    WrongContributionTypeError,
+)
+
+if TYPE_CHECKING:
+    from requests.models import Response
 
 
 @click.group()
 def cli() -> None:
-    """Main command group for command line parsing"""
+    """Create the main command group for command line parsing."""
 
 
-def _load_contributor_table(path: Path) -> ET.Element:
-    """Load and parse the HTML contributor table as seen in `README.rst`
+def _load_contributor_table(path: Path) -> ElementTree.Element:
+    """Load and parse the HTML contributor table as seen in ``README.rst``.
 
-    :param path: Path to `README.rst`
+    :param path: Path to ``README.rst``
     :return: The parsed HTML as an element tree
 
     """
     readme = Path(path).read_text(encoding="utf-8")
     match = re.search(r"<table>.*</table>", readme, re.DOTALL)
     if not match:
-        raise RuntimeError("No contributors HTML table could be found in `README.rst`")
+        section = "contributors HTML table"
+        raise SectionNotFoundError(section, "README.rst")
     contributor_table = match.group(0)
     contributor_table = contributor_table.replace("&", "&amp;")
     try:
-        return cast(ET.Element, defusedxml.ElementTree.fromstring(contributor_table))
-    except ET.ParseError as exc_info:
+        return cast(
+            ElementTree.Element, defusedxml.ElementTree.fromstring(contributor_table)
+        )
+    except ElementTree.ParseError as exc_info:
         linenum, column = exc_info.position
         line = contributor_table.splitlines()[linenum - 1]
         click.echo(line, err=True)
@@ -63,7 +78,7 @@ def _load_contributor_table(path: Path) -> ET.Element:
 
 
 def verify_contribution_type(url: str, contribution_type: str, *args: str) -> None:
-    """Raise an exception if the contribution type for the URL isn't valid
+    """Raise an exception if the contribution type for the URL isn't valid.
 
     :param url: The URL of the search for the author's contributions
     :param contribution_type: The name of the contribution type
@@ -73,9 +88,8 @@ def verify_contribution_type(url: str, contribution_type: str, *args: str) -> No
     """
     valid_contribution_types = args
     if contribution_type not in valid_contribution_types:
-        raise RuntimeError(
-            f"Contribution type for {url} was {contribution_type}, expected"
-            f" {valid_contribution_types}"
+        raise WrongContributionTypeError(
+            url, contribution_type, valid_contribution_types
         )
 
 
@@ -88,27 +102,52 @@ def get_github_repository() -> str:
     """
     # Call `git remote get-url origin` to get the URL of the `origin` remote.
     # Then extract the repository name from the URL.
-    result = run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+    result = run(
+        ["git", "remote", "get-url", "origin"],  # noqa: S603,S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if result.returncode != 0:
-        raise RuntimeError("Could not determine the GitHub repository name")
+        raise GitHubRepoNameError(Path.cwd())
     return result.stdout.split(":")[-1].split(".")[0]
+
+
+CONTRIBUTION_TYPE_VERIFICATION = {
+    "{repo}/issues?q=author%3A": (["Bug reports"], "issues"),
+    "{repo}/commits?author=": (["Code", "Documentation", "Maintenance"], "commits"),
+    "{repo}/pulls?q=is%3Apr+reviewed-by%3A": (
+        ["Reviewed Pull Requests"],
+        "pulls-reviewed",
+    ),
+    "{repo}/pulls?q=is%3Apr+author%3A": (["Code", "Documentation"], "pulls-author"),
+    "{repo}/search?q=commenter": (
+        ["Bug reports", "Reviewed Pull Requests"],
+        "search-comments",
+    ),
+    "{repo}/search?q=": (["Bug reports", "Answering Questions"], "search"),
+    "{repo}/discussions?discussions_q=": (["Bug reports"], "search-discussions"),
+    "conda-forge/staged-recipes/search?q={repo_name}&type=issues&author=": (
+        ["Code"],
+        "conda-issues",
+    ),
+    "conda-forge/{repo_name}-feedstock/search?q=": (["Code"], "feedstock-issues"),
+}
 
 
 @cli.command()
 def verify() -> None:
-    """Verify generated contributor table HTML in `README.rst`
+    """Verify generated contributor table HTML in ``README.rst``.
 
     Output the corresponding YAML source.
 
     """
     repo = get_github_repository()
     repo_name = repo.split("/")[1]
-    root = _load_contributor_table(Path("README.rst"))
     users = {}
-    for td_user in root.findall("tr/td"):
+    for td_user in _load_contributor_table(Path("README.rst")).findall("tr/td"):
         profile_link = td_user[0]
-        profile_url = profile_link.attrib["href"]
-        username = profile_url.rsplit("/", 1)[-1]
+        username = profile_link.attrib["href"].rsplit("/", 1)[-1]
         avatar_alt = profile_link[0].attrib["alt"]
         if username != avatar_alt[1:]:
             click.echo(f"@{username} != {avatar_alt}")
@@ -116,51 +155,21 @@ def verify() -> None:
         for contribution_link in td_user.findall("a")[1:]:
             url = contribution_link.attrib["href"]
             if not url.startswith("https://github.com/"):
-                raise RuntimeError(f"{url} is not a valid GitHub URL")
+                raise InvalidGitHubUrlError(url)
             path = url[19:]
             contribution_type = contribution_link.attrib["title"]
-            if path.startswith(f"{repo}/issues?q=author%3A"):
-                verify_contribution_type(url, contribution_type, "Bug reports")
-                link_type = "issues"
-            elif path.startswith(f"{repo}/commits?author="):
-                verify_contribution_type(
-                    url, contribution_type, "Code", "Documentation", "Maintenance"
-                )
-                link_type = "commits"
-            elif path.startswith(f"{repo}/pulls?q=is%3Apr+reviewed-by%3A"):
-                verify_contribution_type(
-                    url, contribution_type, "Reviewed Pull Requests"
-                )
-                link_type = "pulls-reviewed"
-            elif path.startswith(f"{repo}/pulls?q=is%3Apr+author%3A"):
-                verify_contribution_type(
-                    url, contribution_type, "Code", "Documentation"
-                )
-                link_type = "pulls-author"
-            elif path.startswith(f"{repo}/search?q=commenter"):
-                verify_contribution_type(
-                    url, contribution_type, "Bug reports", "Reviewed Pull Requests"
-                )
-                link_type = "search-comments"
-            elif path.startswith(f"{repo}/search?q="):
-                verify_contribution_type(
-                    url, contribution_type, "Bug reports", "Answering Questions"
-                )
-                link_type = "search"
-            elif path.startswith(f"{repo}/discussions?discussions_q="):
-                verify_contribution_type(url, contribution_type, "Bug reports")
-                link_type = "search-discussions"
-            elif path.startswith(
-                f"conda-forge/staged-recipes/search?q={repo_name}&type=issues&author="
-            ):
-                verify_contribution_type(url, contribution_type, "Code")
-                link_type = "conda-issues"
-            elif path.startswith(f"conda-forge/{repo_name}-feedstock/search?q="):
-                verify_contribution_type(url, contribution_type, "Code")
-                link_type = "feedstock-issues"
+            for path_pattern, (
+                valid_types,
+                link_type,
+            ) in CONTRIBUTION_TYPE_VERIFICATION.items():
+                if path.startswith(path_pattern.format(repo=repo, repo_name=repo_name)):
+                    verify_contribution_type(url, contribution_type, *valid_types)
+                    contributions.append(
+                        {"type": contribution_type, "link_type": link_type}
+                    )
+                    break
             else:
                 raise AssertionError((username, path, contribution_type))
-            contributions.append({"type": contribution_type, "link_type": link_type})
         users[username] = contributions
     click.echo(yaml.dump(users))
 
@@ -182,7 +191,8 @@ CONTRIBUTION_LINKS = {
     "search-comments": "{repo}/search?q=commenter%3A{{username}}&type=issues",
     "search-discussions": "{repo}/discussions?discussions_q=author%3A{{username}}",
     "conda-issues": (
-        "conda-forge/staged-recipes/search?q={repo_name}&type=issues&author={{username}}"
+        "conda-forge/staged-recipes/search"
+        "?q={repo_name}&type=issues&author={{username}}"
     ),
     "feedstock-issues": (
         "conda-forge/{repo_name}-feedstock/search"
@@ -191,30 +201,29 @@ CONTRIBUTION_LINKS = {
 }
 
 
-class NotFoundError(Exception):
-    """Raised when a GitHub API resource is not found"""
-
-
 class GitHubSession(CachedSession):
-    """Caching HTTP request session with useful defaults
+    """Caching HTTP request session with useful defaults.
 
     - GitHub authorization header generated from a given token
     - Accept HTTP paths and prefix them with the GitHub API server name
 
     """
 
-    def __init__(self, token: str, *args: Any, **kwargs: Any) -> None:
+    def __init__(  # type: ignore[misc]
+        self, token: str, *args: Any, **kwargs: Any  # noqa: ANN401
+    ) -> None:
+        """Create the cached requests session with the given GitHub token."""
         super().__init__(*args, **kwargs)
         self.token = token
 
-    def request(  # type: ignore[override]  # pylint: disable=arguments-differ
+    def request(  # type: ignore[override,misc]  # pylint: disable=arguments-differ
         self,
         method: str,
         url: str,
-        headers: MutableMapping[str, str] = None,
-        **kwargs: Any,
+        headers: MutableMapping[str, str] | None = None,
+        **kwargs: Any,  # noqa: ANN401
     ) -> Response:
-        """Query GitHub API with authorization, caching and host auto-fill-in
+        """Query GitHub API with authorization, caching and host auto-fill-in.
 
         Complete the request information with the GitHub API HTTP scheme and hostname,
         and add a GitHub authorization header. Serve requests from the cache if they
@@ -222,7 +231,7 @@ class GitHubSession(CachedSession):
 
         :param method: method for the new `Request` object.
         :param url: URL for the new `Request` object.
-        :param headers: (optional) Dictionary of HTTP Headers to send with the
+        :param headers: (optional) dictionary of HTTP Headers to send with the
                         `Request`.
         :return: The response object
 
@@ -231,12 +240,13 @@ class GitHubSession(CachedSession):
         if url.startswith("/"):
             url = f"https://api.github.com{url}"
         response = super().request(method, url, headers=hdrs, **kwargs)
-        if response.status_code == 404 and response.json()["message"] == "Not Found":
-            raise NotFoundError()
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"{response.status_code} {response.text} when requesting {url}"
-            )
+        if (
+            response.status_code == codes.not_found
+            and response.json()["message"] == "Not Found"
+        ):
+            raise GitHubApiNotFoundError
+        if response.status_code != codes.ok:
+            raise GitHubApiError(response)
         return response
 
 
@@ -255,26 +265,28 @@ ALL_CONTRIBUTORS_END = "   <!-- ALL-CONTRIBUTORS-LIST:END -->"
 @click.option("--token")
 @click.option("-r/+r", "--modify-readme/--no-modify-readme", default=False)
 @click.option("-c/+c", "--modify-contributors/--no-modify-contributors", default=False)
-def update(token: str, modify_readme: bool, modify_contributors: bool) -> None:
-    """Generate an HTML table for `README.rst` and a list for `CONTRIBUTORS.rst`
+def update(
+    token: str, modify_readme: bool, modify_contributors: bool  # noqa: FBT001
+) -> None:
+    """Generate an HTML table for ``README.rst`` and a list for ``CONTRIBUTORS.rst``.
 
-    These contributor lists are generated based on `contributors.yaml`.
+    These contributor lists are generated based on ``contributors.yaml``.
 
     :param token: The GitHub authorization token for avoiding throttling
 
     """
     with Path("contributors.yaml").open(encoding="utf-8") as yaml_file:
-        users_and_contributions: Dict[str, List[Contribution]] = {
+        users_and_contributions: dict[str, list[Contribution]] = {
             login: [Contribution(**c) for c in contributions]
             for login, contributions in yaml.main.safe_load(yaml_file).items()
         }
     session = GitHubSession(token)
     users = join_github_users_with_contributions(users_and_contributions, session)
     doc = render_html(users)
-    print(doc)
+    click.echo(doc)
     contributor_list = render_contributor_list(users)
     contributors_text = "\n".join(sorted(contributor_list, key=lambda s: s.lower()))
-    print(contributors_text)
+    click.echo(contributors_text)
     if modify_readme:
         write_readme(doc)
     if modify_contributors:
@@ -283,13 +295,13 @@ def update(token: str, modify_readme: bool, modify_contributors: bool) -> None:
 
 @dataclass
 class Contribution:
-    """A type of contribution from a user"""
+    """A type of contribution from a user."""
 
     type: str
     link_type: str
 
     def github_search_link(self, login: str) -> str:
-        """Return a link to a GitHub search for a user's contributions
+        """Return a link to a GitHub search for a user's contributions.
 
         :param login: The GitHub username for the user
         :return: A URL link to a GitHub search
@@ -303,36 +315,38 @@ class Contribution:
 
 
 class GitHubUser(TypedDict):
-    """User record as returned by GitHub API `/users/` endpoint"""
+    """User record as returned by GitHub API ``/users/`` endpoint."""
 
     id: int
-    name: Optional[str]
+    name: str | None
     login: str
 
 
 @dataclass
 @total_ordering
 class Contributor:
-    """GitHub user information coupled with a list of repository contributions"""
+    """GitHub user information coupled with a list of repository contributions."""
 
     user_id: int
-    name: Optional[str]
+    name: str | None
     login: str
-    contributions: List[Contribution]
+    contributions: list[Contribution]
 
     def __eq__(self, other: object) -> bool:
+        """Return ``True`` if the object is equal to another `Contributor` object."""
         if not isinstance(other, Contributor):
             return NotImplemented
         return self.login == other.login
 
     def __lt__(self, other: object) -> bool:
+        """Return ``True`` if a contributor is alphabetically earlier than another."""
         if not isinstance(other, Contributor):
             return NotImplemented
         return self.display_name < other.display_name
 
     @property
     def avatar_url(self) -> str:
-        """Return a link to the user's avatar image on GitHub
+        """Return a link to the user's avatar image on GitHub.
 
         :return: A URL to the avatar image
 
@@ -341,7 +355,7 @@ class Contributor:
 
     @property
     def display_name(self) -> str:
-        """A user's display name – either the full name or the login username
+        """A user's display name - either the full name or the login username.
 
         :return: The user's display name
 
@@ -352,8 +366,8 @@ class Contributor:
 RTL_OVERRIDE = "\u202e"
 
 
-def _normalize_rtl_override(text: str) -> str:
-    """Normalize text surrounded by right-to-left override characters
+def _normalize_rtl_override(text: str | None) -> str | None:
+    """Normalize text surrounded by right-to-left override characters.
 
     :param text: Text to normalize
     :return: Normalized text
@@ -366,27 +380,27 @@ def _normalize_rtl_override(text: str) -> str:
     return text[-2:0:-1]
 
 
-DELETED_USERS = {
+DELETED_USERS: dict[str, GitHubUser] = {
     "qubidt": {"id": 6306455, "name": "Bao", "login": "qubidt"},
 }
 
 
 def join_github_users_with_contributions(
-    users_and_contributions: Dict[str, List[Contribution]],
+    users_and_contributions: dict[str, list[Contribution]],
     session: GitHubSession,
-) -> List[Contributor]:
-    """Join GitHub user information with their repository contributions
+) -> list[Contributor]:
+    """Join GitHub user information with their repository contributions.
 
     :param users_and_contributions: GitHub logins and their repository contributions
     :param session: A GitHub API HTTP session
     :return: GitHub user info and the user's repository contributions merged together
 
     """
-    users: List[Contributor] = []
+    users: list[Contributor] = []
     for username, contributions in users_and_contributions.items():
         try:
             gh_user = cast(GitHubUser, session.get(f"/users/{username}").json())
-        except NotFoundError:
+        except GitHubApiNotFoundError:
             gh_user = DELETED_USERS[username]
         name = _normalize_rtl_override(gh_user["name"])
         try:
@@ -400,8 +414,8 @@ def join_github_users_with_contributions(
     return users
 
 
-def make_rows(users: List[Contributor], columns: int) -> List[List[Contributor]]:
-    """Partition users into table rows
+def make_rows(users: list[Contributor], columns: int) -> list[list[Contributor]]:
+    """Partition users into table rows.
 
     :param users: User and contribution information for each contributor
     :param columns: Number of columns in the table
@@ -417,15 +431,15 @@ def make_rows(users: List[Contributor], columns: int) -> List[List[Contributor]]
     ]
 
 
-def render_html(users: List[Contributor]) -> Airium:
-    """Convert users and contributions into an HTML table for `README.rst`
+def render_html(users: list[Contributor]) -> Airium:
+    """Convert users and contributions into an HTML table for ``README.rst``.
 
     :param users: GitHub user records and the users' contributions to the repository
     :return: An Airium document describing the HTML table
 
     """
     doc = Airium()
-    rows_of_users: List[List[Contributor]] = make_rows(users, columns=6)
+    rows_of_users: list[list[Contributor]] = make_rows(users, columns=6)
     with doc.table():
         for row_of_users in rows_of_users:
             with doc.tr():
@@ -449,18 +463,18 @@ def render_html(users: List[Contributor]) -> Airium:
     return doc
 
 
-def render_contributor_list(users: Iterable[Contributor]) -> List[str]:
-    """Render a list of contributors for `CONTRIBUTORS.rst`
+def render_contributor_list(users: Iterable[Contributor]) -> list[str]:
+    """Render a list of contributors for ``CONTRIBUTORS.rst``.
 
-    :param users_and_contributions: Data from `contributors.yaml`
-    :return: A list of strings to go into `CONTRIBUTORS.rst`
+    :param users_and_contributions: Data from ``contributors.yaml``
+    :return: A list of strings to go into ``CONTRIBUTORS.rst``
 
     """
     return [f"- {user.display_name} (@{user.login})" for user in users]
 
 
 def write_readme(doc: Airium) -> None:
-    """Write an updated `README.rst` file
+    """Write an updated ``README.rst`` file.
 
     :param doc: The generated contributors HTML table
 
@@ -478,7 +492,7 @@ def write_readme(doc: Airium) -> None:
 
 
 def write_contributors(text: str) -> None:
-    """Write an updated `CONTRIBUTORS.rst` file
+    """Write an updated ``CONTRIBUTORS.rst`` file.
 
     :param text: The generated list of contributors using reStructuredText markup
 
