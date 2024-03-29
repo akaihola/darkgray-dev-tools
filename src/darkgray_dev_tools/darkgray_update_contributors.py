@@ -30,7 +30,7 @@ import defusedxml.ElementTree
 from airium import Airium
 from requests import codes
 from requests_cache.session import CachedSession
-from ruamel import yaml
+from ruamel.yaml import YAML
 
 from darkgray_dev_tools.exceptions import (
     GitHubApiError,
@@ -171,6 +171,7 @@ def verify() -> None:
             else:
                 raise AssertionError((username, path, contribution_type))
         users[username] = contributions
+    yaml = YAML(typ="safe", pure=True)
     click.echo(yaml.dump(users))
 
 
@@ -276,9 +277,10 @@ def update(
 
     """
     with Path("contributors.yaml").open(encoding="utf-8") as yaml_file:
+        yaml = YAML(typ="safe", pure=True)
         users_and_contributions: dict[str, list[Contribution]] = {
             login: [Contribution(**c) for c in contributions]
-            for login, contributions in yaml.main.safe_load(yaml_file).items()
+            for login, contributions in yaml.load(yaml_file).items()
         }
     session = GitHubSession(token)
     users = join_github_users_with_contributions(users_and_contributions, session)
