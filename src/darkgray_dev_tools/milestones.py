@@ -7,7 +7,8 @@ from warnings import warn
 
 import requests
 from packaging.version import Version
-from setuptools.config.setupcfg import read_configuration
+
+from darkgray_dev_tools.package_metadata import get_repo_url
 
 
 def get_milestone_numbers(token: str | None) -> dict[Version, str]:
@@ -18,7 +19,7 @@ def get_milestone_numbers(token: str | None) -> dict[Version, str]:
     :raises TypeError: Raised on unexpected JSON response
 
     """
-    repo_url = urlsplit(read_configuration("setup.cfg")["metadata"]["url"])
+    repo_url = urlsplit(get_repo_url())
     milestones = requests.get(
         f"https://api.github.com/repos{repo_url.path}/milestones",
         headers={"Authorization": f"Bearer {token}"} if token else {},
@@ -30,7 +31,7 @@ def get_milestone_numbers(token: str | None) -> dict[Version, str]:
     # Extract milestone numbers from the milestone titles. Titles are expected to be
     # like "Darker x.y.z" or "Darker x.y.z - additional comment".
     return {
-        Version(m["title"].split("-")[0].split()[-1]): str(m["number"])
+        Version(m["title"].split(" - ")[0].split()[-1]): str(m["number"])
         for m in milestones
     }
 
