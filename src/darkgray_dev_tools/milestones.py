@@ -31,7 +31,7 @@ def get_milestone_numbers(token: str | None) -> dict[Version, str]:
     # Extract milestone numbers from the milestone titles. Titles are expected to be
     # like "Darker x.y.z" or "Darker x.y.z - additional comment".
     return {
-        Version(m["title"].split("-")[0].split()[-1]): str(m["number"])
+        Version(m["title"].split(" - ")[0].split()[-1]): str(m["number"])
         for m in milestones
     }
 
