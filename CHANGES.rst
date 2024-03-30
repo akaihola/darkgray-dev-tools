@@ -7,6 +7,9 @@ Added
 -----
 - Moved the ``darkgray_update_contributors`` and ``darkgray_verify_contributors`` tools
   from Darker.
+- Support PEP621 packages in ``darkgray_bump_version``.
+- Support package names with dashes in ``darkgray_bump_version``.
+- Take ``darkgray_bump_version`` into use in the package itself.
 
 Removed
 -------
