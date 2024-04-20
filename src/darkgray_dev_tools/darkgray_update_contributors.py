@@ -16,7 +16,7 @@ Usage::
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache, total_ordering
 from itertools import groupby
 from pathlib import Path
@@ -278,13 +278,18 @@ def update(
     """
     with Path("contributors.yaml").open(encoding="utf-8") as yaml_file:
         yaml = YAML(typ="safe", pure=True)
+        *configs, contributors_src = yaml.load_all(yaml_file)
+        if len(configs) > 1:
+            message = "Too many YAML documents in contributors.yaml"
+            raise ValueError(message)
+        config = Configuration(**(configs[0] if configs else {}))
         users_and_contributions: dict[str, list[Contribution]] = {
             login: [Contribution(**c) for c in contributions]
-            for login, contributions in yaml.load(yaml_file).items()
+            for login, contributions in contributors_src.items()
         }
     session = GitHubSession(token)
     users = join_github_users_with_contributions(users_and_contributions, session)
-    doc = render_html(users)
+    doc = render_html(users, config)
     click.echo(doc)
     contributor_list = render_contributor_list(users)
     contributors_text = "\n".join(sorted(contributor_list, key=lambda s: s.lower()))
@@ -295,6 +300,22 @@ def update(
         write_contributors(contributors_text)
 
 
+def get_cwd_repository() -> list[str]:
+    """Get the GitHub repository name from the current working directory.
+
+    :return: The GitHub repository name
+
+    """
+    return [get_github_repository()]
+
+
+@dataclass
+class Configuration:
+    """Configuration for updating contributors."""
+
+    repositories: list[str] = field(default_factory=get_cwd_repository)
+
+
 @dataclass
 class Contribution:
     """A type of contribution from a user."""
@@ -302,16 +323,20 @@ class Contribution:
     type: str
     link_type: str
 
-    def github_search_link(self, login: str) -> str:
+    def github_search_link(self, login: str, config: Configuration) -> str:
         """Return a link to a GitHub search for a user's contributions.
 
         :param login: The GitHub username for the user
+        :param config: Configuration for updating contributors
         :return: A URL link to a GitHub search
 
         """
+        primary_repo = config.repositories[0]
         link_template = CONTRIBUTION_LINKS[self.link_type].format(
-            repo=get_github_repository(),
-            repo_name=get_github_repository().split("/")[1],
+            repo=primary_repo,
+            repo_name=primary_repo.split("/")[1],
+            repos=config.repositories,
+            repos_query="+".join(f"repo%3A{repo}" for repo in config.repositories),
         )
         return f"https://github.com/{link_template}".format(username=login)
 
@@ -433,10 +458,11 @@ def make_rows(users: list[Contributor], columns: int) -> list[list[Contributor]]
     ]
 
 
-def render_html(users: list[Contributor]) -> Airium:
+def render_html(users: list[Contributor], config: Configuration) -> Airium:
     """Convert users and contributions into an HTML table for ``README.rst``.
 
     :param users: GitHub user records and the users' contributions to the repository
+    :param config: Configuration for updating contributors
     :return: An Airium document describing the HTML table
 
     """
@@ -458,7 +484,9 @@ def render_html(users: list[Contributor]) -> Airium:
                         doc.br()
                         for contribution in user.contributions:
                             doc.a(
-                                href=contribution.github_search_link(user.login),
+                                href=contribution.github_search_link(
+                                    user.login, config
+                                ),
                                 title=contribution.type,
                                 _t=CONTRIBUTION_SYMBOLS[contribution.type],
                             )
