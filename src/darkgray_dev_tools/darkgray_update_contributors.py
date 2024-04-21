@@ -22,7 +22,16 @@ from itertools import groupby
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent, indent
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    MutableMapping,
+    Protocol,
+    TypedDict,
+    cast,
+)
+from urllib.parse import urlencode, urljoin
 from xml.etree import ElementTree  # nosec
 
 import click
@@ -175,6 +184,86 @@ def verify() -> None:
     click.echo(yaml.dump(users))
 
 
+@dataclass
+class FormatAndJoin:
+    """Format a delimited list from the given key in the keyword arguments.
+
+    >>> fmt = FormatAndJoin(" OR ", "repos", "repo:{}")
+    >>> print(fmt.format(repos=["me/repo1", "me.repo2"]))
+    repo:me/repo1 OR repo:me.repo2
+
+    """
+
+    sep: str
+    key: str
+    fmt: str
+
+    def format(self, **kwargs: list[SupportsFormat]) -> str:
+        """Emulate the `str.format` method.
+
+        :param kwargs: The keyword arguments, containing the key to get the list of
+                       items from
+        :return: A string with the formatted items joined by the separator
+
+        """
+        items = kwargs[self.key]
+        formatted_items = (self.fmt.format(item) for item in items)
+        return self.sep.join(formatted_items)
+
+
+class SupportsFormat(Protocol):
+    """Protocol for objects that support a `str.format` like formatting method.
+
+    This is used only for type checking with Mypy.
+
+    """
+
+    def format(self, **kwargs: Any) -> str:  # type: ignore[misc]  # noqa: ANN401
+        """Signature for the ``format`` method."""
+
+
+class UrlPath:
+    """A URL path with query parameters as lists of format strings.
+
+    >>> p = UrlPath(
+    ...     "search",
+    ...     q=[FormatAndJoin(" ", "repos", "repo:{}"), " who:me"],
+    ...     type=["issues"]
+    ... )
+    >>> print(p.render("https://github.com", repos=["me/repo1", "me/repo2"]))
+    https://github.com/search?q=repo%3Ame%2Frepo1+repo%3Ame%2Frepo2+who%3Ame&type=issues
+
+    """
+
+    def __init__(self, path: str, **query_params: list[SupportsFormat]) -> None:
+        """Create a new URL path with query parameters.
+
+        :param path: The URL path, e.g. ``search``
+        :param query_params: Query parameters as lists of format strings
+
+        """
+        self.path = path
+        self.query_params = query_params
+
+    def render(  # type: ignore[misc]
+        self, base_url: str, **kwargs: Any  # noqa: ANN401
+    ) -> str:
+        """Render the URL path with the given keyword arguments.
+
+        :param base_url: The base URL path, e.g. ``https://github.com/``
+        :param kwargs: The keyword arguments to format the query parameters with
+        :return: The rendered URL path
+
+        """
+        path = urljoin(base_url, self.path)
+        query_params = [
+            (key, "".join(part.format(**kwargs) for part in fmt))
+            for key, fmt in self.query_params.items()
+        ]
+        encoded_query_params = urlencode(query_params)
+        return f"{path}?{encoded_query_params}"
+
+
 CONTRIBUTION_SYMBOLS = {
     "Bug reports": "🐛",
     "Code": "💻",
@@ -184,20 +273,56 @@ CONTRIBUTION_SYMBOLS = {
     "Maintenance": "🚧",
 }
 CONTRIBUTION_LINKS = {
-    "issues": "{repo}/issues?q=author%3A{{username}}",
-    "commits": "{repo}/commits?author={{username}}",
-    "pulls-reviewed": "{repo}/pulls?q=is%3Apr+reviewed-by%3A{{username}}",
-    "pulls-author": "{repo}/pulls?q=is%3Apr+author%3A{{username}}",
-    "search": "{repo}/search?q={{username}}",
-    "search-comments": "{repo}/search?q=commenter%3A{{username}}&type=issues",
-    "search-discussions": "{repo}/discussions?discussions_q=author%3A{{username}}",
-    "conda-issues": (
-        "conda-forge/staged-recipes/search"
-        "?q={repo_name}&type=issues&author={{username}}"
+    "issues": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " author:{username}"],
+        type=["issues"],
     ),
-    "feedstock-issues": (
-        "conda-forge/{repo_name}-feedstock/search"
-        "?q={repo_name}+author%3A{{username}}&type=issues"
+    "commits": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " author:{username}"],
+        type=["commits"],
+    ),
+    "pulls-reviewed": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " reviewed-by:{username}"],
+        type=["pullrequests"],
+    ),
+    "pulls-author": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " author:{username}"],
+        type=["pullrequests"],
+    ),
+    "search": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " {username}"],
+    ),
+    "search-comments": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " commenter:{username}"],
+        type=["issues"],
+    ),
+    "search-discussions": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " involves:{username}"],
+        type=["discussions"],
+    ),
+    "conda-issues": UrlPath(
+        "search",
+        q=[
+            "repo:conda-forge/staged-recipes ",
+            FormatAndJoin(" OR ", "repos", "{}"),
+            " involves:{username}",
+        ],
+        type=["pullrequests"],
+    ),
+    "feedstock-issues": UrlPath(
+        "search",
+        q=[
+            FormatAndJoin(" OR ", "repo_names", "repo:conda-forge/{}-feedstock"),
+            " involves:{username}",
+        ],
+        type=["issues"],
     ),
 }
 
@@ -331,14 +456,13 @@ class Contribution:
         :return: A URL link to a GitHub search
 
         """
-        primary_repo = config.repositories[0]
-        link_template = CONTRIBUTION_LINKS[self.link_type].format(
-            repo=primary_repo,
-            repo_name=primary_repo.split("/")[1],
+        contribution_link = CONTRIBUTION_LINKS[self.link_type]
+        return contribution_link.render(
+            "https://github.com/",
             repos=config.repositories,
-            repos_query="+".join(f"repo%3A{repo}" for repo in config.repositories),
+            repo_names=[repo.split("/")[1] for repo in config.repositories],
+            username=login,
         )
-        return f"https://github.com/{link_template}".format(username=login)
 
 
 class GitHubUser(TypedDict):
