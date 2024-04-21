@@ -7,7 +7,6 @@ Usage::
         --token=<ghp_your_github_token> \
         --modify-readme \
         --modify-contributors
-    darkgray-verify-contributors
 
 """
 
@@ -15,7 +14,6 @@ Usage::
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from functools import lru_cache, total_ordering
 from itertools import groupby
@@ -32,10 +30,8 @@ from typing import (
     cast,
 )
 from urllib.parse import urlencode, urljoin
-from xml.etree import ElementTree  # nosec
 
 import click
-import defusedxml.ElementTree
 from airium import Airium
 from requests import codes
 from requests_cache.session import CachedSession
@@ -45,9 +41,6 @@ from darkgray_dev_tools.exceptions import (
     GitHubApiError,
     GitHubApiNotFoundError,
     GitHubRepoNameError,
-    InvalidGitHubUrlError,
-    SectionNotFoundError,
-    WrongContributionTypeError,
 )
 
 if TYPE_CHECKING:
@@ -57,49 +50,6 @@ if TYPE_CHECKING:
 @click.group()
 def cli() -> None:
     """Create the main command group for command line parsing."""
-
-
-def _load_contributor_table(path: Path) -> ElementTree.Element:
-    """Load and parse the HTML contributor table as seen in ``README.rst``.
-
-    :param path: Path to ``README.rst``
-    :return: The parsed HTML as an element tree
-
-    """
-    readme = Path(path).read_text(encoding="utf-8")
-    match = re.search(r"<table>.*</table>", readme, re.DOTALL)
-    if not match:
-        section = "contributors HTML table"
-        raise SectionNotFoundError(section, "README.rst")
-    contributor_table = match.group(0)
-    contributor_table = contributor_table.replace("&", "&amp;")
-    try:
-        return cast(
-            ElementTree.Element, defusedxml.ElementTree.fromstring(contributor_table)
-        )
-    except ElementTree.ParseError as exc_info:
-        linenum, column = exc_info.position
-        line = contributor_table.splitlines()[linenum - 1]
-        click.echo(line, err=True)
-        click.echo((column - 1) * " ", nl=False, err=True)
-        click.echo("^", err=True)
-        raise
-
-
-def verify_contribution_type(url: str, contribution_type: str, *args: str) -> None:
-    """Raise an exception if the contribution type for the URL isn't valid.
-
-    :param url: The URL of the search for the author's contributions
-    :param contribution_type: The name of the contribution type
-    :param args: Valid contribution types for this type of URL path
-    :raises RuntimeError: Raised if the contribution type isn't valid
-
-    """
-    valid_contribution_types = args
-    if contribution_type not in valid_contribution_types:
-        raise WrongContributionTypeError(
-            url, contribution_type, valid_contribution_types
-        )
 
 
 @lru_cache(maxsize=1)
@@ -142,46 +92,6 @@ CONTRIBUTION_TYPE_VERIFICATION = {
     ),
     "conda-forge/{repo_name}-feedstock/search?q=": (["Code"], "feedstock-issues"),
 }
-
-
-@cli.command()
-def verify() -> None:
-    """Verify generated contributor table HTML in ``README.rst``.
-
-    Output the corresponding YAML source.
-
-    """
-    repo = get_github_repository()
-    repo_name = repo.split("/")[1]
-    users = {}
-    for td_user in _load_contributor_table(Path("README.rst")).findall("tr/td"):
-        profile_link = td_user[0]
-        username = profile_link.attrib["href"].rsplit("/", 1)[-1]
-        avatar_alt = profile_link[0].attrib["alt"]
-        if username != avatar_alt[1:]:
-            click.echo(f"@{username} != {avatar_alt}")
-        contributions = []
-        for contribution_link in td_user.findall("a")[1:]:
-            url = contribution_link.attrib["href"]
-            if not url.startswith("https://github.com/"):
-                raise InvalidGitHubUrlError(url)
-            path = url[19:]
-            contribution_type = contribution_link.attrib["title"]
-            for path_pattern, (
-                valid_types,
-                link_type,
-            ) in CONTRIBUTION_TYPE_VERIFICATION.items():
-                if path.startswith(path_pattern.format(repo=repo, repo_name=repo_name)):
-                    verify_contribution_type(url, contribution_type, *valid_types)
-                    contributions.append(
-                        {"type": contribution_type, "link_type": link_type}
-                    )
-                    break
-            else:
-                raise AssertionError((username, path, contribution_type))
-        users[username] = contributions
-    yaml = YAML(typ="safe", pure=True)
-    click.echo(yaml.dump(users))
 
 
 @dataclass

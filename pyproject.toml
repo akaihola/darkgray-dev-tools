@@ -9,7 +9,6 @@ dynamic = ["version", "description"]
 dependencies = [
     "airium>=0.2.3",
     "click>=8.0.0",
-    "defusedxml>=0.7.1",
     "pyproject-parser",
     "requests_cache>=0.7",
     "ruamel.yaml>=0.15.78",
@@ -21,7 +20,6 @@ Home = "https://github.com/akaihola/darkgray-dev-tools"
 
 [project.scripts]
 darkgray_bump_version = "darkgray_dev_tools.darkgray_bump_version:bump_version"
-darkgray_verify_contributors = "darkgray_dev_tools.darkgray_update_contributors:verify"
 darkgray_update_contributors = "darkgray_dev_tools.darkgray_update_contributors:update"
 
 [tool.black]
