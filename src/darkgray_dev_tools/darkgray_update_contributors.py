@@ -16,13 +16,22 @@ Usage::
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache, total_ordering
 from itertools import groupby
 from pathlib import Path
 from subprocess import run
 from textwrap import dedent, indent
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    MutableMapping,
+    Protocol,
+    TypedDict,
+    cast,
+)
+from urllib.parse import urlencode, urljoin
 from xml.etree import ElementTree  # nosec
 
 import click
@@ -175,6 +184,86 @@ def verify() -> None:
     click.echo(yaml.dump(users))
 
 
+@dataclass
+class FormatAndJoin:
+    """Format a delimited list from the given key in the keyword arguments.
+
+    >>> fmt = FormatAndJoin(" OR ", "repos", "repo:{}")
+    >>> print(fmt.format(repos=["me/repo1", "me.repo2"]))
+    repo:me/repo1 OR repo:me.repo2
+
+    """
+
+    sep: str
+    key: str
+    fmt: str
+
+    def format(self, **kwargs: list[SupportsFormat]) -> str:
+        """Emulate the `str.format` method.
+
+        :param kwargs: The keyword arguments, containing the key to get the list of
+                       items from
+        :return: A string with the formatted items joined by the separator
+
+        """
+        items = kwargs[self.key]
+        formatted_items = (self.fmt.format(item) for item in items)
+        return self.sep.join(formatted_items)
+
+
+class SupportsFormat(Protocol):
+    """Protocol for objects that support a `str.format` like formatting method.
+
+    This is used only for type checking with Mypy.
+
+    """
+
+    def format(self, **kwargs: Any) -> str:  # type: ignore[misc]  # noqa: ANN401
+        """Signature for the ``format`` method."""
+
+
+class UrlPath:
+    """A URL path with query parameters as lists of format strings.
+
+    >>> p = UrlPath(
+    ...     "search",
+    ...     q=[FormatAndJoin(" ", "repos", "repo:{}"), " who:me"],
+    ...     type=["issues"]
+    ... )
+    >>> print(p.render("https://github.com", repos=["me/repo1", "me/repo2"]))
+    https://github.com/search?q=repo%3Ame%2Frepo1+repo%3Ame%2Frepo2+who%3Ame&type=issues
+
+    """
+
+    def __init__(self, path: str, **query_params: list[SupportsFormat]) -> None:
+        """Create a new URL path with query parameters.
+
+        :param path: The URL path, e.g. ``search``
+        :param query_params: Query parameters as lists of format strings
+
+        """
+        self.path = path
+        self.query_params = query_params
+
+    def render(  # type: ignore[misc]
+        self, base_url: str, **kwargs: Any  # noqa: ANN401
+    ) -> str:
+        """Render the URL path with the given keyword arguments.
+
+        :param base_url: The base URL path, e.g. ``https://github.com/``
+        :param kwargs: The keyword arguments to format the query parameters with
+        :return: The rendered URL path
+
+        """
+        path = urljoin(base_url, self.path)
+        query_params = [
+            (key, "".join(part.format(**kwargs) for part in fmt))
+            for key, fmt in self.query_params.items()
+        ]
+        encoded_query_params = urlencode(query_params)
+        return f"{path}?{encoded_query_params}"
+
+
 CONTRIBUTION_SYMBOLS = {
     "Bug reports": "🐛",
     "Code": "💻",
@@ -184,20 +273,56 @@ CONTRIBUTION_SYMBOLS = {
     "Maintenance": "🚧",
 }
 CONTRIBUTION_LINKS = {
-    "issues": "{repo}/issues?q=author%3A{{username}}",
-    "commits": "{repo}/commits?author={{username}}",
-    "pulls-reviewed": "{repo}/pulls?q=is%3Apr+reviewed-by%3A{{username}}",
-    "pulls-author": "{repo}/pulls?q=is%3Apr+author%3A{{username}}",
-    "search": "{repo}/search?q={{username}}",
-    "search-comments": "{repo}/search?q=commenter%3A{{username}}&type=issues",
-    "search-discussions": "{repo}/discussions?discussions_q=author%3A{{username}}",
-    "conda-issues": (
-        "conda-forge/staged-recipes/search"
-        "?q={repo_name}&type=issues&author={{username}}"
+    "issues": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " author:{username}"],
+        type=["issues"],
     ),
-    "feedstock-issues": (
-        "conda-forge/{repo_name}-feedstock/search"
-        "?q={repo_name}+author%3A{{username}}&type=issues"
+    "commits": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " author:{username}"],
+        type=["commits"],
+    ),
+    "pulls-reviewed": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " reviewed-by:{username}"],
+        type=["pullrequests"],
+    ),
+    "pulls-author": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " author:{username}"],
+        type=["pullrequests"],
+    ),
+    "search": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " {username}"],
+    ),
+    "search-comments": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " commenter:{username}"],
+        type=["issues"],
+    ),
+    "search-discussions": UrlPath(
+        "search",
+        q=[FormatAndJoin(" ", "repos", "repo:{}"), " involves:{username}"],
+        type=["discussions"],
+    ),
+    "conda-issues": UrlPath(
+        "search",
+        q=[
+            "repo:conda-forge/staged-recipes ",
+            FormatAndJoin(" OR ", "repos", "{}"),
+            " involves:{username}",
+        ],
+        type=["pullrequests"],
+    ),
+    "feedstock-issues": UrlPath(
+        "search",
+        q=[
+            FormatAndJoin(" OR ", "repo_names", "repo:conda-forge/{}-feedstock"),
+            " involves:{username}",
+        ],
+        type=["issues"],
     ),
 }
 
@@ -278,13 +403,18 @@ def update(
     """
     with Path("contributors.yaml").open(encoding="utf-8") as yaml_file:
         yaml = YAML(typ="safe", pure=True)
+        *configs, contributors_src = yaml.load_all(yaml_file)
+        if len(configs) > 1:
+            message = "Too many YAML documents in contributors.yaml"
+            raise ValueError(message)
+        config = Configuration(**(configs[0] if configs else {}))
         users_and_contributions: dict[str, list[Contribution]] = {
             login: [Contribution(**c) for c in contributions]
-            for login, contributions in yaml.load(yaml_file).items()
+            for login, contributions in contributors_src.items()
         }
     session = GitHubSession(token)
     users = join_github_users_with_contributions(users_and_contributions, session)
-    doc = render_html(users)
+    doc = render_html(users, config)
     click.echo(doc)
     contributor_list = render_contributor_list(users)
     contributors_text = "\n".join(sorted(contributor_list, key=lambda s: s.lower()))
@@ -295,6 +425,22 @@ def update(
         write_contributors(contributors_text)
 
 
+def get_cwd_repository() -> list[str]:
+    """Get the GitHub repository name from the current working directory.
+
+    :return: The GitHub repository name
+
+    """
+    return [get_github_repository()]
+
+
+@dataclass
+class Configuration:
+    """Configuration for updating contributors."""
+
+    repositories: list[str] = field(default_factory=get_cwd_repository)
+
+
 @dataclass
 class Contribution:
     """A type of contribution from a user."""
@@ -302,18 +448,21 @@ class Contribution:
     type: str
     link_type: str
 
-    def github_search_link(self, login: str) -> str:
+    def github_search_link(self, login: str, config: Configuration) -> str:
         """Return a link to a GitHub search for a user's contributions.
 
         :param login: The GitHub username for the user
+        :param config: Configuration for updating contributors
         :return: A URL link to a GitHub search
 
         """
-        link_template = CONTRIBUTION_LINKS[self.link_type].format(
-            repo=get_github_repository(),
-            repo_name=get_github_repository().split("/")[1],
+        contribution_link = CONTRIBUTION_LINKS[self.link_type]
+        return contribution_link.render(
+            "https://github.com/",
+            repos=config.repositories,
+            repo_names=[repo.split("/")[1] for repo in config.repositories],
+            username=login,
         )
-        return f"https://github.com/{link_template}".format(username=login)
 
 
 class GitHubUser(TypedDict):
@@ -433,10 +582,11 @@ def make_rows(users: list[Contributor], columns: int) -> list[list[Contributor]]
     ]
 
 
-def render_html(users: list[Contributor]) -> Airium:
+def render_html(users: list[Contributor], config: Configuration) -> Airium:
     """Convert users and contributions into an HTML table for ``README.rst``.
 
     :param users: GitHub user records and the users' contributions to the repository
+    :param config: Configuration for updating contributors
     :return: An Airium document describing the HTML table
 
     """
@@ -458,7 +608,9 @@ def render_html(users: list[Contributor]) -> Airium:
                         doc.br()
                         for contribution in user.contributions:
                             doc.a(
-                                href=contribution.github_search_link(user.login),
+                                href=contribution.github_search_link(
+                                    user.login, config
+                                ),
                                 title=contribution.type,
                                 _t=CONTRIBUTION_SYMBOLS[contribution.type],
                             )

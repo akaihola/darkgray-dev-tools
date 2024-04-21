@@ -5,6 +5,10 @@ These features will be included in the next release:
 
 Added
 -----
+- Multiple repositories can now be specified in a separate configuration section in
+  ``contributors.yaml``.
+- Contribution search links now point to the `/search` page on GitHub and support
+  searching multiple repositories.
 
 Fixed
 -----
