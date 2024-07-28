@@ -8,6 +8,7 @@ Added
 
 Fixed
 -----
+- Upgrade Airium for compatibility with recent Pip versions.
 
 
 0.1.0_ - 2024-04-21
