@@ -7,7 +7,7 @@ name = "darkgray_dev_tools"
 authors = [{name = "Antti Kaihola", email = "13725+akaihola@users.noreply.github.com"}]
 dynamic = ["version", "description"]
 dependencies = [
-    "airium>=0.2.3",
+    "airium>=0.2.6",
     "click>=8.0.0",
     "pyproject-parser",
     "requests_cache>=0.7",
