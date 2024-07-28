@@ -8,6 +8,13 @@ Added
 
 Fixed
 -----
+
+
+0.1.1_ - 2024-07-28
+===================
+
+Fixed
+-----
 - Upgrade Airium for compatibility with recent Pip versions.
 
 
@@ -46,7 +53,7 @@ Added
 - Moved the ``darkgray_bump_version`` tool from Darker.
 
 
-.. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.0...HEAD
+.. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.1...HEAD
 .. _0.1.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.2...v0.1.0
 .. _0.0.2: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.1...v0.0.2
 .. _0.0.1: https://github.com/akaihola/darkgray-dev-tools/compare/4afdc29...v0.0.1
