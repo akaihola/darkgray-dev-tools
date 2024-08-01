@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import click
 import keyring
 import requests
@@ -13,7 +15,10 @@ HTTP_NOT_FOUND = 404
 
 @click.command()
 @click.option("--repo", required=True, help="Repository in the format owner/repo")
-def collect_contributors(repo: str) -> None:
+@click.option(
+    "--since", help="ISO date to collect contributions from (e.g., 2023-01-01)"
+)
+def collect_contributors(repo: str, since: str | None) -> None:
     """Collect and print GitHub usernames of contributors to a repository."""
     token = keyring.get_password("gh:github.com", "")
     if not token:
@@ -27,9 +32,10 @@ def collect_contributors(repo: str) -> None:
     base_url = f"{GITHUB_API_URL}/repos/{repo}"
 
     contributors: set[str] = set()
+    since_date = datetime.fromisoformat(since) if since else None
 
-    collect_issues_and_prs(base_url, contributors, headers)
-    collect_discussions(base_url, contributors, headers)
+    collect_issues_and_prs(base_url, contributors, headers, since_date)
+    collect_discussions(base_url, contributors, headers, since_date)
 
     click.echo("\n---\n\n")
     for username in sorted(contributors):
@@ -37,11 +43,16 @@ def collect_contributors(repo: str) -> None:
 
 
 def collect_issues_and_prs(
-    base_url: str, contributors: set[str], headers: dict[str, str]
+    base_url: str,
+    contributors: set[str],
+    headers: dict[str, str],
+    since_date: datetime | None,
 ) -> None:
     """Collect issue and PR authors and commenters."""
     for endpoint in ["issues", "pulls"]:
         url = f"{base_url}/{endpoint}?state=all"
+        if since_date:
+            url += f"&since={since_date.isoformat()}"
         while url:
             response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
@@ -66,10 +77,15 @@ def collect_issues_and_prs(
 
 
 def collect_discussions(
-    base_url: str, contributors: set[str], headers: dict[str, str]
+    base_url: str,
+    contributors: set[str],
+    headers: dict[str, str],
+    since_date: datetime | None,
 ) -> None:
     """Collect discussion authors and commenters if discussions are enabled."""
     url = f"{base_url}/discussions"
+    if since_date:
+        url += f"?since={since_date.isoformat()}"
     try:
         response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
