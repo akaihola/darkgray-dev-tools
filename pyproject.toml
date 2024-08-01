@@ -21,6 +21,7 @@ Home = "https://github.com/akaihola/darkgray-dev-tools"
 [project.scripts]
 darkgray_bump_version = "darkgray_dev_tools.darkgray_bump_version:bump_version"
 darkgray_update_contributors = "darkgray_dev_tools.darkgray_update_contributors:update"
+darkgray_collect_contributors = "darkgray_dev_tools.darkgray_collect_contributors:collect_contributors"
 
 [tool.black]
 line-length = 88
