@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +15,9 @@ import requests
 import ruamel.yaml
 
 from darkgray_dev_tools.darkgray_update_contributors import Contribution
+from darkgray_dev_tools.exceptions import GitHubRepoNameError
+
+UNSUPPORTED_GIT_URL_ERROR = "Unsupported Git remote URL format"
 
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
@@ -23,13 +28,45 @@ yaml = ruamel.yaml.YAML(typ="safe", pure=True)
 yaml.indent(offset=2)
 
 
+def get_repo_from_git() -> str:
+    """Get the repository name from the Git remote URL."""
+    git_path = shutil.which("git")
+    if git_path is None:
+        raise GitHubRepoNameError(Path.cwd()) from None
+
+    def execute_git_command() -> str:
+        try:
+            return subprocess.check_output(
+                [git_path, "config", "--get", "remote.origin.url"],  # noqa: S603
+                universal_newlines=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        except subprocess.CalledProcessError as err:
+            raise GitHubRepoNameError(Path.cwd()) from err
+
+    def parse_remote_url(remote_url: str) -> str:
+        if remote_url.startswith("git@github.com:"):
+            return remote_url.split(":")[-1].rstrip(".git")
+        if remote_url.startswith(("https://github.com/", "git://github.com/")):
+            return "/".join(remote_url.split("/")[-2:]).rstrip(".git")
+        raise ValueError(UNSUPPORTED_GIT_URL_ERROR)
+
+    try:
+        remote_url = execute_git_command()
+        return parse_remote_url(remote_url)
+    except ValueError as err:
+        raise GitHubRepoNameError(Path.cwd()) from err
+
+
 @click.command()
-@click.option("--repo", required=True, help="Repository in the format owner/repo")
+@click.option("--repo", help="Repository in the format owner/repo")
 @click.option(
     "--since", help="ISO date to collect contributions from (e.g., 2023-01-01)"
 )
-def collect_contributors(repo: str, since: str | None) -> None:
+def collect_contributors(repo: str | None, since: str | None) -> None:
     """Collect and print GitHub usernames of contributors to a repository."""
+    if repo is None:
+        repo = get_repo_from_git()
     token = keyring.get_password("gh:github.com", "")
     if not token:
         error_message = (
