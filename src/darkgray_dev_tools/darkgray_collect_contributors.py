@@ -15,6 +15,7 @@ import ruamel.yaml
 from darkgray_dev_tools.darkgray_update_contributors import Contribution
 
 GITHUB_API_URL = "https://api.github.com"
+GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 REQUEST_TIMEOUT = 10
 HTTP_NOT_FOUND = 404
 
@@ -47,7 +48,7 @@ def collect_contributors(repo: str, since: str | None) -> None:
     )
 
     collect_issues_and_prs(base_url, contributors, headers, since_date)
-    collect_discussions(base_url, contributors, headers, since_date)
+    collect_discussions(repo, contributors, headers, since_date)
 
     click.echo("\n---\n\n")
     # write contributors to stdout as YAML
@@ -188,62 +189,90 @@ def collect_issues_and_prs(
 
 
 def collect_discussions(
-    base_url: str,
+    repo: str,
     contributors: Contributors,
     headers: dict[str, str],
     since_date: str | None,
 ) -> None:
-    """Collect discussion authors and commenters if discussions are enabled."""
-    url = f"{base_url}/discussions?sort=updated&direction=desc"
-    if since_date:
-        url += f"?since={since_date}"
-    try:
-        while url:
-            response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
-            if since_date and all(item["updated_at"] < since_date for item in data):
+    """Collect discussion authors and commenters using GraphQL API."""
+    owner, name = repo.split("/")
+    query = """
+    query($owner: String!, $name: String!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        discussions(first: 100,
+                    after: $cursor,
+                    orderBy: {field: UPDATED_AT, direction: DESC}) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            id
+            number
+            author {
+              login
+            }
+            updatedAt
+            comments(first: 100) {
+              nodes {
+                author {
+                  login
+                }
+                updatedAt
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    variables = {"owner": owner, "name": name, "cursor": None}
+
+    has_next_page = True
+    while has_next_page:
+        response = requests.post(
+            GITHUB_GRAPHQL_URL,
+            headers=headers,
+            json={"query": query, "variables": variables},
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        discussions = data["data"]["repository"]["discussions"]["nodes"]
+        for discussion in discussions:
+            author_login = discussion["author"]["login"]
+            discussion_number = discussion["number"]
+            updated_at = discussion["updatedAt"]
+
+            if since_date and updated_at < since_date:
+                has_next_page = False
                 break
-            for discussion in data:
-                login = discussion["author"]["login"]
-                object_id = discussion["id"]
-                updated_at = discussion["updated_at"]
+
+            contributors.add_contribution(
+                author_login,
+                "discussions",
+                "author",
+                discussion_number,
+                updated_at,
+            )
+
+            for comment in discussion["comments"]["nodes"]:
+                comment_login = comment["author"]["login"]
+                comment_updated_at = comment["updatedAt"]
+
+                if since_date and comment_updated_at < since_date:
+                    continue
+
                 contributors.add_contribution(
-                    login,
+                    comment_login,
                     "discussions",
-                    "author",
-                    object_id,
-                    updated_at,
+                    "commenter",
+                    discussion_number,
+                    comment_updated_at,
                 )
 
-                if since_date and discussion["updated_at"] < since_date:
-                    continue
-                comments_url = discussion["comments_url"]
-                comments_response = requests.get(
-                    comments_url, headers=headers, timeout=REQUEST_TIMEOUT
-                )
-                comments_response.raise_for_status()
-                comments_data = comments_response.json()
-                for comment in comments_data["data"]:
-                    comment_login = comment["author"]["login"]
-                    if comment_login not in contributors:
-                        click.echo(
-                            f"{comment_login}  "
-                            f"# commenter for discussion #{object_id} "
-                            f"(updated {comment["updated_at"][:10]})"
-                        )
-                    contributors.add_contribution(
-                        comment_login,
-                        "discussions",
-                        "commenter",
-                        object_id,
-                        comment["updated_at"],
-                    )
-            url = response.links.get("next", {}).get("url")
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == HTTP_NOT_FOUND:
-            click.echo(
-                "Discussions are not enabled for this repository. Skipping.", err=True
-            )
-        else:
-            raise
+        page_info = data["data"]["repository"]["discussions"]["pageInfo"]
+        has_next_page = has_next_page and page_info["hasNextPage"]
+        variables["cursor"] = page_info["endCursor"]
