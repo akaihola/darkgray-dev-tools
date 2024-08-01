@@ -199,10 +199,13 @@ def collect_issues_and_prs(
             if since_date and all(item["updated_at"] < since_date for item in data):
                 break
             for item in data:
-                login = item["user"]["login"]
                 number = item["number"]
                 contributors.add_contribution(
-                    login, endpoint, "author", number, item["updated_at"]
+                    item["user"]["login"],
+                    endpoint,
+                    "author",
+                    number,
+                    item["updated_at"],
                 )
 
                 if since_date and item["updated_at"] < since_date:
@@ -214,9 +217,8 @@ def collect_issues_and_prs(
                 comments_response.raise_for_status()
                 comments_data = comments_response.json()
                 for comment in comments_data:
-                    comment_login = comment["user"]["login"]
                     contributors.add_contribution(
-                        comment_login,
+                        comment["user"]["login"],
                         endpoint,
                         "commenter",
                         number,
@@ -279,7 +281,6 @@ def collect_discussions(
 
         discussions = data["data"]["repository"]["discussions"]["nodes"]
         for discussion in discussions:
-            author_login = discussion["author"]["login"]
             discussion_number = discussion["number"]
             updated_at = discussion["updatedAt"]
 
@@ -288,7 +289,7 @@ def collect_discussions(
                 break
 
             contributors.add_contribution(
-                author_login,
+                discussion["author"]["login"],
                 "discussions",
                 "author",
                 discussion_number,
@@ -296,14 +297,13 @@ def collect_discussions(
             )
 
             for comment in discussion["comments"]["nodes"]:
-                comment_login = comment["author"]["login"]
                 comment_updated_at = comment["updatedAt"]
 
                 if since_date and comment_updated_at < since_date:
                     continue
 
                 contributors.add_contribution(
-                    comment_login,
+                    comment["author"]["login"],
                     "discussions",
                     "commenter",
                     discussion_number,
