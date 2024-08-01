@@ -138,7 +138,7 @@ class Contributors:
         """Add contribution type to contributors."""
         if login not in self._contributors:
             click.echo(
-                f"{login}  "
+                f"  - {login}  "
                 f"# {role} for {endpoint[:-1]} #{object_num} "
                 f"(updated {updated_at[:10]})"
             )
@@ -192,7 +192,7 @@ def collect_issues_and_prs(
         if since_date:
             url += f"&since={since_date}"
         while url:
-            click.echo(url)
+            click.echo(f"{endpoint} and their comments:")
             response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
@@ -270,6 +270,7 @@ def collect_discussions(
 
     has_next_page = True
     while has_next_page:
+        click.echo("discussions and their comments:")
         response = requests.post(
             GITHUB_GRAPHQL_URL,
             headers=headers,
