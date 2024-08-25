@@ -31,42 +31,63 @@ class Review:
 
 
 def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
-    """Fetch approved reviews for the repository.
+    """Fetch approved reviews for the repository using GraphQL API.
 
     :param session: The GitHub API session
     :param repo: The repository name (owner/repo)
     :return: A list of approved reviews
     """
+    owner, name = repo.split('/')
+    query = """
+    query($owner: String!, $name: String!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequests(first: 100, after: $cursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            number
+            title
+            reviews(first: 1, states: APPROVED) {
+              nodes {
+                author {
+                  login
+                }
+                submittedAt
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    
     approved_reviews = []
-    page = 1
+    variables = {"owner": owner, "name": name, "cursor": None}
+    
     while True:
-        response = session.get(f"/repos/{repo}/pulls", params={"state": "all", "per_page": 100, "page": page})
+        response = session.post("https://api.github.com/graphql", json={"query": query, "variables": variables})
         if response.status_code != codes.ok:
             raise GitHubApiError(response)
         
-        pulls = response.json()
-        if not pulls:
-            break
-
-        for pull in pulls:
-            pr_number = pull["number"]
-            pr_title = pull["title"]
-            reviews_response = session.get(f"/repos/{repo}/pulls/{pr_number}/reviews")
-            if reviews_response.status_code != codes.ok:
-                raise GitHubApiError(reviews_response)
-            
-            reviews = reviews_response.json()
-            approved_review = next((r for r in reviews if r["state"] == "APPROVED"), None)
-            if approved_review:
+        data = response.json()["data"]["repository"]["pullRequests"]
+        
+        for pr in data["nodes"]:
+            if pr["reviews"]["nodes"]:
+                review = pr["reviews"]["nodes"][0]
                 approved_reviews.append(Review(
-                    pr_number=pr_number,
-                    pr_title=pr_title,
-                    reviewer=approved_review["user"]["login"],
-                    submitted_at=datetime.fromisoformat(approved_review["submitted_at"].replace("Z", "+00:00"))
+                    pr_number=pr["number"],
+                    pr_title=pr["title"],
+                    reviewer=review["author"]["login"],
+                    submitted_at=datetime.fromisoformat(review["submittedAt"].replace("Z", "+00:00"))
                 ))
         
-        page += 1
-
+        if not data["pageInfo"]["hasNextPage"]:
+            break
+        
+        variables["cursor"] = data["pageInfo"]["endCursor"]
+    
     return approved_reviews
 
 
