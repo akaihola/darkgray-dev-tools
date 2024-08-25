@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, List
 
 import click
+import yaml
 from requests import codes
 
 from darkgray_dev_tools.darkgray_update_contributors import GitHubSession, get_github_repository
@@ -94,19 +95,27 @@ def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
 @click.command()
 @click.option("--token", required=True, help="GitHub API token")
 def show_reviews(token: str) -> None:
-    """Show timestamps and approvers of most recent approved reviews."""
+    """Show timestamps and approvers of most recent approved reviews in YAML format."""
     session = GitHubSession(token)
     repo = get_github_repository()
     
     approved_reviews = get_approved_reviews(session, repo)
     approved_reviews.sort(key=lambda r: r.submitted_at, reverse=True)
 
-    click.echo(f"Most recent approved reviews for {repo}:")
-    for review in approved_reviews:
-        click.echo(f"PR #{review.pr_number}: '{review.pr_title}'")
-        click.echo(f"  Approved by: {review.reviewer}")
-        click.echo(f"  Timestamp: {review.submitted_at}")
-        click.echo()
+    yaml_data: Dict[str, List[Dict[str, Any]]] = {
+        "repository": repo,
+        "approved_reviews": [
+            {
+                "pr_number": review.pr_number,
+                "pr_title": review.pr_title,
+                "approved_by": review.reviewer,
+                "timestamp": review.submitted_at.isoformat()
+            }
+            for review in approved_reviews
+        ]
+    }
+
+    click.echo(yaml.dump(yaml_data, sort_keys=False))
 
 
 if __name__ == "__main__":
