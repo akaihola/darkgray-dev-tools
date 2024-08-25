@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 import click
-import yaml
+from ruamel.yaml import YAML
 from requests import codes
 
 from darkgray_dev_tools.darkgray_update_contributors import GitHubSession, get_github_repository
@@ -115,7 +115,9 @@ def show_reviews(token: str) -> None:
         ]
     }
 
-    click.echo(yaml.dump(yaml_data, sort_keys=False))
+    yaml = YAML()
+    yaml.default_flow_style = False
+    yaml.dump(yaml_data, click.get_text_stream('stdout'))
 
 
 if __name__ == "__main__":
