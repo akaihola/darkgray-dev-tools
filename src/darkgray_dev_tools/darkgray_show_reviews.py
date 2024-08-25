@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List
+from collections import defaultdict
 
 import click
 from ruamel.yaml import YAML
@@ -92,10 +93,19 @@ def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
     return approved_reviews
 
 
+def generate_monthly_stats(approved_reviews: List[Review]) -> Dict[str, Dict[str, int]]:
+    """Generate monthly statistics of approvals by reviewer."""
+    stats = defaultdict(lambda: defaultdict(int))
+    for review in approved_reviews:
+        month_key = review.submitted_at.strftime("%Y-%m")
+        stats[month_key][review.reviewer] += 1
+    return dict(stats)
+
 @click.command()
 @click.option("--token", required=True, help="GitHub API token")
 @click.option("--include-owner", is_flag=True, help="Include reviews by the repository owner")
-def show_reviews(token: str, include_owner: bool) -> None:
+@click.option("--stats", is_flag=True, help="Show monthly statistics instead of individual reviews")
+def show_reviews(token: str, include_owner: bool, stats: bool) -> None:
     """Show timestamps and approvers of most recent approved reviews in YAML format."""
     session = GitHubSession(token)
     repo = get_github_repository()
@@ -107,18 +117,24 @@ def show_reviews(token: str, include_owner: bool) -> None:
     if not include_owner:
         approved_reviews = [review for review in approved_reviews if review.reviewer != owner]
 
-    yaml_data: Dict[str, List[Dict[str, Any]]] = {
-        "repository": repo,
-        "approved_reviews": [
-            {
-                "pr_number": review.pr_number,
-                "pr_title": review.pr_title,
-                "approved_by": review.reviewer,
-                "timestamp": review.submitted_at.isoformat()
-            }
-            for review in approved_reviews
-        ]
-    }
+    if stats:
+        yaml_data = {
+            "repository": repo,
+            "monthly_stats": generate_monthly_stats(approved_reviews)
+        }
+    else:
+        yaml_data = {
+            "repository": repo,
+            "approved_reviews": [
+                {
+                    "pr_number": review.pr_number,
+                    "pr_title": review.pr_title,
+                    "approved_by": review.reviewer,
+                    "timestamp": review.submitted_at.isoformat()
+                }
+                for review in approved_reviews
+            ]
+        }
 
     yaml = YAML()
     yaml.default_flow_style = False
