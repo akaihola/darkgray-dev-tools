@@ -11,12 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List
-from collections import defaultdict
 
 import click
-from ruamel.yaml import YAML
 from requests import codes
+from ruamel.yaml import YAML
 
 from darkgray_dev_tools.darkgray_update_contributors import (
     GitHubSession,
@@ -46,7 +44,9 @@ def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
     query = """
     query($owner: String!, $name: String!, $cursor: String) {
       repository(owner: $owner, name: $name) {
-        pullRequests(first: 100, after: $cursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        pullRequests(first: 100,
+                     after: $cursor,
+                     orderBy: {field: UPDATED_AT, direction: DESC}) {
           pageInfo {
             hasNextPage
             endCursor
@@ -103,9 +103,9 @@ def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
     return approved_reviews
 
 
-def generate_monthly_stats(approved_reviews: List[Review]) -> Dict[str, Dict[str, int]]:
+def generate_monthly_stats(approved_reviews: list[Review]) -> dict[str, dict[str, int]]:
     """Generate monthly statistics of approvals by reviewer."""
-    stats: Dict[str, Dict[str, int]] = {}
+    stats: dict[str, dict[str, int]] = {}
     for review in approved_reviews:
         month_key = review.submitted_at.strftime("%Y-%m")
         if month_key not in stats:
@@ -124,8 +124,8 @@ def generate_monthly_stats(approved_reviews: List[Review]) -> Dict[str, Dict[str
     is_flag=True,
     help="Show monthly statistics instead of individual reviews",
 )
-def show_reviews(token: str, include_owner: bool, stats: bool) -> None:
-    """Show timestamps and approvers of most recent approved reviews in YAML format."""
+def show_reviews(token: str, include_owner: bool, stats: bool) -> None:  # noqa: FBT001
+    """Show timestamps and reviewers of most recent approved reviews in YAML format."""
     session = GitHubSession(token)
     repo = get_github_repository()
     owner, _ = repo.split("/")
