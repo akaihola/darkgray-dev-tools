@@ -95,11 +95,13 @@ def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
 
 def generate_monthly_stats(approved_reviews: List[Review]) -> Dict[str, Dict[str, int]]:
     """Generate monthly statistics of approvals by reviewer."""
-    stats = defaultdict(lambda: defaultdict(int))
+    stats: Dict[str, Dict[str, int]] = {}
     for review in approved_reviews:
         month_key = review.submitted_at.strftime("%Y-%m")
-        stats[month_key][review.reviewer] += 1
-    return dict(stats)
+        if month_key not in stats:
+            stats[month_key] = {}
+        stats[month_key][review.reviewer] = stats[month_key].get(review.reviewer, 0) + 1
+    return stats
 
 @click.command()
 @click.option("--token", required=True, help="GitHub API token")
