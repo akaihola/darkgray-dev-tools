@@ -94,13 +94,18 @@ def get_approved_reviews(session: GitHubSession, repo: str) -> list[Review]:
 
 @click.command()
 @click.option("--token", required=True, help="GitHub API token")
-def show_reviews(token: str) -> None:
+@click.option("--include-owner", is_flag=True, help="Include reviews by the repository owner")
+def show_reviews(token: str, include_owner: bool) -> None:
     """Show timestamps and approvers of most recent approved reviews in YAML format."""
     session = GitHubSession(token)
     repo = get_github_repository()
+    owner, _ = repo.split('/')
     
     approved_reviews = get_approved_reviews(session, repo)
     approved_reviews.sort(key=lambda r: r.submitted_at, reverse=True)
+
+    if not include_owner:
+        approved_reviews = [review for review in approved_reviews if review.reviewer != owner]
 
     yaml_data: Dict[str, List[Dict[str, Any]]] = {
         "repository": repo,
