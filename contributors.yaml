@@ -1,0 +1,3 @@
+akaihola:
+  - {link_type: issues, type: Bug reports}
+  - {link_type: pulls-author, type: Code}
