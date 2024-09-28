@@ -543,7 +543,9 @@ def write_readme(doc: Airium) -> None:
     :param doc: The generated contributors HTML table
 
     """
-    readme_content = Path("README.rst").read_text(encoding="utf-8")
+    readme_rst_path = Path("README.rst")
+    readme_path = readme_rst_path if readme_rst_path.exists() else Path("README.md")
+    readme_content = readme_path.read_text(encoding="utf-8")
     start_index = readme_content.index(ALL_CONTRIBUTORS_START) + len(
         ALL_CONTRIBUTORS_START
     )
@@ -552,7 +554,7 @@ def write_readme(doc: Airium) -> None:
     after = readme_content[end_index:]
     table = indent(str(doc), "   ")
     new_readme_content = f"{before}{table}{after}"
-    Path("README.rst").write_text(new_readme_content, encoding="utf-8")
+    readme_path.write_text(new_readme_content, encoding="utf-8")
 
 
 def write_contributors(text: str) -> None:
