@@ -13,6 +13,7 @@ dependencies = [
     "requests_cache>=0.7",
     "ruamel.yaml>=0.15.78",
     "setuptools>=61",
+    "gql>=3.0.0",
 ]
 
 [project.urls]
@@ -21,6 +22,7 @@ Home = "https://github.com/akaihola/darkgray-dev-tools"
 [project.scripts]
 darkgray_bump_version = "darkgray_dev_tools.darkgray_bump_version:bump_version"
 darkgray_update_contributors = "darkgray_dev_tools.darkgray_update_contributors:update"
+darkgray_show_reviews = "darkgray_dev_tools.darkgray_show_reviews:show_reviews"
 
 [tool.black]
 line-length = 88
@@ -30,6 +32,16 @@ profile = "black"
 
 [tool.ruff]
 target-version = "py38"
+line-length = 88
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -38,4 +50,11 @@ ignore = [
     "COM812",  # Trailing comma missing
     "D203",  # One blank line required before class docstring
     "D213",  # Multi-line docstring summary should start at the second line
+    "ISC001",  # Single line implicit string concatenation (conflicts with formatter)
 ]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = []
+known-third-party = ["pytest"]
