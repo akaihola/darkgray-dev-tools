@@ -5,6 +5,9 @@ These features will be included in the next release:
 
 Added
 -----
+- New ``darkgray_show_reviews`` command to display timestamps and approvers of recent
+  approved pull request reviews. The command supports options for including repository
+  owner reviews and generating monthly statistics.
 
 Fixed
 -----
