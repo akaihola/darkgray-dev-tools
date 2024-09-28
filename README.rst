@@ -39,7 +39,8 @@ If neither --major nor --minor is specified, the patch version is incremented.
 darkgray_update_contributors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Update contributor lists in README.rst and CONTRIBUTORS.rst::
+Update contributor lists in ``README.rst`` (or ``README.md``, detected automatically)
+and ``CONTRIBUTORS.rst``::
 
     darkgray_update_contributors
       --token=<github_token>
@@ -81,6 +82,7 @@ Development
 -----------
 
 To contribute to this project, please see the CONTRIBUTING.rst file for guidelines.
+
 
 License
 -------

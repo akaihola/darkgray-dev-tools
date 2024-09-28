@@ -11,6 +11,8 @@ Added
 - Added ``darkgray_collect_contributors`` tool to gather GitHub usernames of
   contributors to a repository, including issue authors, PR authors, and commenters.
 - A ``README.rst`` file and a guide for contributors in ``CONTIBUTING.rst``.
+- In ``darkgray_update_contributors``, support and automatically detect ``README.md``
+  in addition to ``README.rst``.
 
 Fixed
 -----
