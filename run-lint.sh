@@ -1,34 +1,7 @@
 #!/usr/bin/env bash
 
-VENV=$HOME/.virtualenvs/darker
-PIP=${VENV}/bin/pip
-[ ! -f ${PIP} ] && python -m venv ${VENV} && ${PIP} install -U pip
-${PIP} install -q -e .
-${PIP} uninstall -q -y ruff
-
-ensure() { command -v $1 >/dev/null || ${PIP} install -q $1; }
-
-ensure black
-ensure codespell
+uv sync --all-extras
 
 errors=0
-
-source ${VENV}/bin/activate
-for file in "$@"; do
-    case "$file" in
-        *.py)
-            ruff format "$file" || errors=$?
-            graylint --quiet --revision origin/main \
-              --lint "mypy ." \
-              --lint "ruff check" \
-              --lint "codespell" \
-              "$file" || errors=$?
-            ;;
-        *.sh|*.md|*.rst|*.txt)
-            codespell "$file" || errors=$?
-            ;;
-    esac
-done
-deactivate
-
+.venv/bin/pre-commit run --all-files graylint || errors=$?
 exit $errors

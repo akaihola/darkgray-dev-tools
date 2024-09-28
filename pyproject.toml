@@ -16,6 +16,12 @@ dependencies = [
     "gql>=3.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pre-commit-uv",
+]
+
 [project.urls]
 Home = "https://github.com/akaihola/darkgray-dev-tools"
 
@@ -59,3 +65,15 @@ unfixable = []
 [tool.ruff.lint.isort]
 known-first-party = []
 known-third-party = ["pytest"]
+
+[tool.graylint]
+revision = "origin/main"
+lint = [
+    "mypy",
+    "ruff check",
+    "codespell",
+]
+
+[tool.darker]
+revision = "origin/main"
+formatter = "ruff"
