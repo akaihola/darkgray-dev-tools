@@ -9,6 +9,7 @@ dynamic = ["version", "description"]
 dependencies = [
     "airium>=0.2.6",
     "click>=8.0.0",
+    "keyring",
     "pyproject-parser",
     "requests_cache>=0.7",
     "ruamel.yaml>=0.15.78",
@@ -20,6 +21,7 @@ dependencies = [
 dev = [
     "pre-commit",
     "pre-commit-uv",
+    "pytest",
 ]
 
 [project.urls]
