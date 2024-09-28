@@ -5,9 +5,11 @@ These features will be included in the next release:
 
 Added
 -----
-- New ``darkgray_show_reviews`` command to display timestamps and approvers of recent
+- New ``darkgray_show_reviews`` command to display timestamps and reviewers of recent
   approved pull request reviews. The command supports options for including repository
   owner reviews and generating monthly statistics.
+- Added ``darkgray_collect_contributors`` tool to gather GitHub usernames of
+  contributors to a repository, including issue authors, PR authors, and commenters.
 
 Fixed
 -----
