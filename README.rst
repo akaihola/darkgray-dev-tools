@@ -4,11 +4,12 @@
 
 Development tools for Darker, Graylint and Darkgraylib projects.
 
-This package provides three command-line tools:
+This package provides four command-line tools:
 
 1. ``darkgray_bump_version``
 2. ``darkgray_update_contributors``
 3. ``darkgray_show_reviews``
+4. ``darkgray_collect_contributors``
 
 Installation
 ------------
@@ -68,6 +69,21 @@ Options:
   --stats          Show monthly statistics instead of individual reviews
 
 The output is in YAML format.
+
+darkgray_collect_contributors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Collect GitHub usernames of contributors to a repository.
+
+.. code-block:: bash
+
+    darkgray_collect_contributors [--repo=<owner/repo>] [--since=<ISO_date>]
+
+Options:
+  --repo   Repository in the format owner/repo (optional, defaults to current git repository)
+  --since  ISO date to collect contributions from (e.g., 2023-01-01)
+
+The output is in YAML format and includes contributors' GitHub usernames along with their contribution types.
 
 Development
 -----------
