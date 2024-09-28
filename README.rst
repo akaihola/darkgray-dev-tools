@@ -14,9 +14,7 @@ This package provides four command-line tools:
 Installation
 ------------
 
-Install the package from PyPI:
-
-.. code-block:: bash
+Install the package from PyPI::
 
     pip install darkgray_dev_tools
 
@@ -26,9 +24,7 @@ Usage
 darkgray_bump_version
 ^^^^^^^^^^^^^^^^^^^^^
 
-Bump the version number in project files.
-
-.. code-block:: bash
+Bump the version number in project files::
 
     darkgray_bump_version {--major|--minor} [--dry-run] [--token=<github_token>]
 
@@ -43,11 +39,11 @@ If neither --major nor --minor is specified, the patch version is incremented.
 darkgray_update_contributors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Update contributor lists in README.rst and CONTRIBUTORS.rst.
+Update contributor lists in README.rst and CONTRIBUTORS.rst::
 
-.. code-block:: bash
-
-    darkgray_update_contributors --token=<github_token> [--modify-readme] [--modify-contributors]
+    darkgray_update_contributors
+      --token=<github_token>
+      [--modify-readme] [--modify-contributors]
 
 Options:
   --token                GitHub API token (required)
@@ -57,9 +53,7 @@ Options:
 darkgray_show_reviews
 ^^^^^^^^^^^^^^^^^^^^^
 
-Show timestamps and reviewers of most recent approved reviews.
-
-.. code-block:: bash
+Show timestamps and reviewers of most recent approved reviews::
 
     darkgray_show_reviews --token=<github_token> [--include-owner] [--stats]
 
@@ -73,9 +67,7 @@ The output is in YAML format.
 darkgray_collect_contributors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Collect GitHub usernames of contributors to a repository.
-
-.. code-block:: bash
+Collect GitHub usernames of contributors to a repository::
 
     darkgray_collect_contributors [--repo=<owner/repo>] [--since=<ISO_date>]
 
