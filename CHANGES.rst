@@ -10,9 +10,15 @@ Added
   owner reviews and generating monthly statistics.
 - Added ``darkgray_collect_contributors`` tool to gather GitHub usernames of
   contributors to a repository, including issue authors, PR authors, and commenters.
-- A ``README.rst`` file and a guide for contributors in ``CONTIBUTING.rst``.
+- A ``README.rst`` file and a guide for contributors in ``CONTRIBUTING.rst``.
 - In ``darkgray_update_contributors``, support and automatically detect ``README.md``
   in addition to ``README.rst``.
+- The repo-summary-post_ GitHub action now auto-generates a weekly project activity
+  summary in the Announcements_ discussion category.
+- Pytest_ and keyring_ as dependencies.
+- Use uv_ and pre-commit_ for testing and linting.
+- Basic configuration for using use Aider_ as a coding assistant to develop these tools.
+- Ruff_ configuration settings.
 
 Fixed
 -----
@@ -23,7 +29,7 @@ Fixed
 
 Fixed
 -----
-- Upgrade Airium for compatibility with recent Pip versions.
+- Upgrade the Airium_ HTML builder for compatibility with recent Pip versions.
 
 
 0.1.0_ - 2024-04-21
@@ -46,8 +52,8 @@ Fixed
 Added
 -----
 - Moved the ``darkgray_update_contributors`` and ``darkgray_verify_contributors`` tools
-  from Darker.
-- Support PEP621 packages in ``darkgray_bump_version``.
+  from Darker_.
+- Support `PEP 621`_ packages in ``darkgray_bump_version``.
 - Support package names with dashes in ``darkgray_bump_version``.
 - Take ``darkgray_bump_version`` into use in the package itself.
 
@@ -58,10 +64,21 @@ Added
 Added
 -----
 - Created the package.
-- Moved the ``darkgray_bump_version`` tool from Darker.
+- Moved the ``darkgray_bump_version`` tool from Darker_.
 
 
 .. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.1...HEAD
 .. _0.1.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.2...v0.1.0
 .. _0.0.2: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.1...v0.0.2
 .. _0.0.1: https://github.com/akaihola/darkgray-dev-tools/compare/4afdc29...v0.0.1
+.. _repo-summary-post: https://github.com/akaihola/repo-summary-post
+.. _Announcements: https://github.com/akaihola/darkgray-dev-tools/discussions/categories/announcements
+.. _Pytest: https://pytest.org/
+.. _keyring: https://pypi.org/project/keyring/
+.. _uv: https://docs.astral.sh/uv
+.. _pre-commit: https://pre-commit.com/
+.. _Aider: https://aider.chat/
+.. _Ruff: https://docs.astral.sh/ruff
+.. _Airium: https://pypi.org/project/airium/
+.. _Darker: https://pypi.org/project/darker/
+.. _PEP 621: https://packaging.python.org/en/latest/specifications/pyproject-toml/#pyproject-toml-spec
