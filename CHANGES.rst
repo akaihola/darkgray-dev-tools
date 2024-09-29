@@ -5,6 +5,16 @@ These features will be included in the next release:
 
 Added
 -----
+
+Fixed
+-----
+
+
+0.2.0_ - 2024-09-29
+===================
+
+Added
+-----
 - New ``darkgray_show_reviews`` command to display timestamps and reviewers of recent
   approved pull request reviews. The command supports options for including repository
   owner reviews and generating monthly statistics.
@@ -67,7 +77,9 @@ Added
 - Moved the ``darkgray_bump_version`` tool from Darker_.
 
 
-.. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.1...HEAD
+.. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.2.0...HEAD
+.. _0.2.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.1...v0.2.0
+.. _0.1.1: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.0...v0.1.1
 .. _0.1.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.2...v0.1.0
 .. _0.0.2: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.1...v0.0.2
 .. _0.0.1: https://github.com/akaihola/darkgray-dev-tools/compare/4afdc29...v0.0.1
