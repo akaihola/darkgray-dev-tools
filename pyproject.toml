@@ -64,6 +64,12 @@ ignore = [
 fixable = ["ALL"]
 unfixable = []
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = [
+    "INP001",  # File is part of an implicit namespace package. Add an `__init__.py`.
+    "S101",  # Use of `assert` detected
+]
+
 [tool.ruff.lint.isort]
 known-first-party = []
 known-third-party = ["pytest"]
