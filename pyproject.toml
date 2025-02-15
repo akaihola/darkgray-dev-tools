@@ -17,8 +17,10 @@ dependencies = [
     "gql>=3.0.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
+    "codespell",
+    "mypy",
     "pre-commit",
     "pre-commit-uv",
     "pytest",
