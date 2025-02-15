@@ -192,7 +192,8 @@ def collect_issues_and_prs(
         if since_date:
             url += f"&since={since_date}"
         while url:
-            click.echo(f"{endpoint} and their comments:")
+            params = url.split("?")[-1]
+            click.echo(f"{endpoint} and their comments from {params}:")
             response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
