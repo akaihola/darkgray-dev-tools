@@ -46,7 +46,10 @@ def get_repo_from_git() -> str:
 
     def parse_remote_url(remote_url: str) -> str:
         if remote_url.startswith("git@github.com:"):
-            return remote_url.split(":")[-1].rstrip(".git")
+            repo_name = remote_url.split(":")[-1]
+            if repo_name.endswith(".git"):
+                return repo_name[:-4]
+            return repo_name
         if remote_url.startswith(("https://github.com/", "git://github.com/")):
             return "/".join(remote_url.split("/")[-2:]).rstrip(".git")
         raise ValueError(UNSUPPORTED_GIT_URL_ERROR)
