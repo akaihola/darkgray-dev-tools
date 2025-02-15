@@ -5,5 +5,5 @@ uv sync --quiet --all-extras --all-groups
 UV_PYTHON=.venv
 
 errors=0
-.venv/bin/pre-commit run --all-files graylint || errors=$?
+uv run graylint . || errors=$?
 exit $errors
