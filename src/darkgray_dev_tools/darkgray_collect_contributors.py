@@ -315,3 +315,7 @@ def collect_discussions(
         page_info = data["data"]["repository"]["discussions"]["pageInfo"]
         has_next_page = has_next_page and page_info["hasNextPage"]
         variables["cursor"] = page_info["endCursor"]
+
+
+if __name__ == "__main__":
+    collect_contributors()
