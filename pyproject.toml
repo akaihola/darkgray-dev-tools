@@ -58,7 +58,6 @@ docstring-code-line-length = "dynamic"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN101",  # Missing type annotation for `self` in method
     "COM812",  # Trailing comma missing
     "D203",  # One blank line required before class docstring
     "D213",  # Multi-line docstring summary should start at the second line
