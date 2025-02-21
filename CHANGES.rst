@@ -8,6 +8,8 @@ Added
 
 Fixed
 -----
+- Support ``[dependency-groups]`` in ``pyproject.toml`` by upgrading to
+  ``pyproject-parser`` 0.13.0b1.
 
 
 0.2.0_ - 2024-09-29
