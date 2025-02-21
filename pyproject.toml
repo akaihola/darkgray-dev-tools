@@ -10,7 +10,7 @@ dependencies = [
     "airium>=0.2.6",
     "click>=8.0.0",
     "keyring",
-    "pyproject-parser",
+    "pyproject-parser>=0.13.0b1",
     "requests_cache>=0.7",
     "ruamel.yaml>=0.15.78",
     "setuptools>=61",
