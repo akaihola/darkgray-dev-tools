@@ -5,6 +5,8 @@ These features will be included in the next release:
 
 Added
 -----
+- ``suggest_constraint`` command to suggest a new maximum version constraint for a
+  dependency.
 
 Fixed
 -----
