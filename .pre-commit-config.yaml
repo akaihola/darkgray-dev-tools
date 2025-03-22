@@ -4,8 +4,10 @@ repos:
   hooks:
     - id: graylint
       additional_dependencies:
+        - click  # so Mypy can check type hints
         - codespell
         - mypy
+        - packaging  # so Mypy can check type hints
         - ruff
 - repo: https://github.com/akaihola/darker
   rev: ruff-plugin
