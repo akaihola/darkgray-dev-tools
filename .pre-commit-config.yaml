@@ -10,7 +10,7 @@ repos:
         - packaging  # so Mypy can check type hints
         - ruff
 - repo: https://github.com/akaihola/darker
-  rev: ruff-plugin
+  rev: master
   hooks:
     - id: darker
       args:
