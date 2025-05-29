@@ -203,13 +203,14 @@ def collect_issues_and_prs(
                 break
             for item in data:
                 number = item["number"]
-                contributors.add_contribution(
-                    item["user"]["login"],
-                    endpoint,
-                    "author",
-                    number,
-                    item["updated_at"],
-                )
+                if item["user"]["login"] != "github-actions":
+                    contributors.add_contribution(
+                        item["user"]["login"],
+                        endpoint,
+                        "author",
+                        number,
+                        item["updated_at"],
+                    )
 
                 if since_date and item["updated_at"] < since_date:
                     continue
@@ -220,6 +221,8 @@ def collect_issues_and_prs(
                 comments_response.raise_for_status()
                 comments_data = comments_response.json()
                 for comment in comments_data:
+                    if comment["user"]["login"] == "github-actions":
+                        continue
                     contributors.add_contribution(
                         comment["user"]["login"],
                         endpoint,
@@ -292,18 +295,22 @@ def collect_discussions(
                 has_next_page = False
                 break
 
-            contributors.add_contribution(
-                discussion["author"]["login"],
-                "discussions",
-                "author",
-                discussion_number,
-                updated_at,
-            )
+            if discussion["author"]["login"] != "github-actions":
+                contributors.add_contribution(
+                    discussion["author"]["login"],
+                    "discussions",
+                    "author",
+                    discussion_number,
+                    updated_at,
+                )
 
             for comment in discussion["comments"]["nodes"]:
                 comment_updated_at = comment["updatedAt"]
 
                 if since_date and comment_updated_at < since_date:
+                    continue
+
+                if comment["author"]["login"] == "github-actions":
                     continue
 
                 contributors.add_contribution(
