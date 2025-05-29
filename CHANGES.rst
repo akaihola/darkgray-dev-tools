@@ -12,6 +12,8 @@ Fixed
 -----
 - Support ``[dependency-groups]`` in ``pyproject.toml`` by upgrading to
   ``pyproject-parser`` 0.13.0b1.
+- Ignore the ``github-actions`` user for issues, discussions and comments in
+  ``darkgray_collect_contributors``.
 
 
 0.2.0_ - 2024-09-29
