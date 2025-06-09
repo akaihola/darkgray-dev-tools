@@ -20,6 +20,7 @@ requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
+    "codespell",
     "pre-commit",
     "pre-commit-uv",
     "pytest",
@@ -33,6 +34,7 @@ darkgray_bump_version = "darkgray_dev_tools.darkgray_bump_version:bump_version"
 darkgray_update_contributors = "darkgray_dev_tools.darkgray_update_contributors:update"
 darkgray_show_reviews = "darkgray_dev_tools.darkgray_show_reviews:show_reviews"
 darkgray_collect_contributors = "darkgray_dev_tools.darkgray_collect_contributors:collect_contributors"
+darkgray_suggest_constraint = "darkgray_dev_tools.darkgray_suggest_constraint:suggest_constraint"
 
 [tool.black]
 line-length = 88
