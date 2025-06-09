@@ -1,0 +1,39 @@
+name: Pre-commit checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for graylint to compare against main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+
+      - name: Run pre-commit
+        run: uvx --with=pre-commit-uv pre-commit run --all-files
+
+      - name: Upload pre-commit output as artifact
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: pre-commit-output
+          path: |
+            .pre-commit.log
+          retention-days: 5

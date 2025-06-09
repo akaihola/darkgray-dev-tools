@@ -1,5 +1,8 @@
 """Script to collect GitHub usernames of contributors to a repository."""
 
+# pylint: disable=R0801
+#         (Similar lines in GraphQL queries)
+
 from __future__ import annotations
 
 import shutil

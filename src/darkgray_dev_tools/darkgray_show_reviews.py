@@ -7,6 +7,9 @@ Usage::
 
 """
 
+# pylint: disable=R0801
+#         (Similar lines in GraphQL queries)
+
 from __future__ import annotations
 
 from dataclasses import dataclass

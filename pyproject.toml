@@ -16,6 +16,7 @@ dependencies = [
     "setuptools>=61",
     "gql>=3.0.0",
 ]
+requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
@@ -55,7 +56,6 @@ docstring-code-line-length = "dynamic"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN101",  # Missing type annotation for `self` in method
     "COM812",  # Trailing comma missing
     "D203",  # One blank line required before class docstring
     "D213",  # Multi-line docstring summary should start at the second line
