@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from dataclasses import asdict
@@ -26,6 +27,14 @@ GITHUB_API_URL = "https://api.github.com"
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 REQUEST_TIMEOUT = 10
 HTTP_NOT_FOUND = 404
+# SSH format: git@github.com:owner/repo
+#          or git@github.com:owner/repo.git
+RE_GITHUB_SSH = re.compile(r"^git@github\.com:([^/]+/[^/]+?)(?:\.git)?/?$")
+# HTTPS/Git format, for example https://github.com/owner/repo/
+#                              or git://github.com/owner/repo.git
+RE_GITHUB_HTTPS = re.compile(
+    r"^(?:https?|git)://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$"
+)
 
 yaml = ruamel.yaml.YAML(typ="safe", pure=True)
 yaml.indent(offset=2)
@@ -48,10 +57,12 @@ def get_repo_from_git() -> str:
             raise GitHubRepoNameError(Path.cwd()) from err
 
     def parse_remote_url(remote_url: str) -> str:
-        if remote_url.startswith("git@github.com:"):
-            return remote_url.split(":")[-1].rstrip(".git")
-        if remote_url.startswith(("https://github.com/", "git://github.com/")):
-            return "/".join(remote_url.split("/")[-2:]).rstrip(".git")
+        ssh_match = RE_GITHUB_SSH.match(remote_url)
+        if ssh_match:
+            return ssh_match.group(1)
+        https_match = RE_GITHUB_HTTPS.match(remote_url)
+        if https_match:
+            return https_match.group(1)
         raise ValueError(UNSUPPORTED_GIT_URL_ERROR)
 
     try:
