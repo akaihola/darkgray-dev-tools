@@ -5,6 +5,16 @@ These features will be included in the next release:
 
 Added
 -----
+
+Fixed
+-----
+
+
+0.3.0_ - 2025-08-25
+===================
+
+Added
+-----
 - ``suggest_constraint`` command to suggest a new maximum version constraint for a
   dependency.
 
@@ -83,7 +93,7 @@ Added
 - Moved the ``darkgray_bump_version`` tool from Darker_.
 
 
-.. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.2.0...HEAD
+.. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.3.0...HEAD
 .. _0.2.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.1...v0.2.0
 .. _0.1.1: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.0...v0.1.1
 .. _0.1.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.2...v0.1.0
