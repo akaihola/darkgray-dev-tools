@@ -15,6 +15,7 @@ Fixed
 
 Added
 -----
+- To get a repository URL, support more sources in ``pyproject.toml`` and ``setup.cfg``.
 - ``suggest_constraint`` command to suggest a new maximum version constraint for a
   dependency.
 
@@ -24,6 +25,14 @@ Fixed
   ``pyproject-parser`` 0.13.0b1.
 - Ignore the ``github-actions`` user for issues, discussions and comments in
   ``darkgray_collect_contributors``.
+
+Removed
+-------
+- Support for Python 3.8. We now support all versions 3.9 and up.
+
+Internal
+--------
+- Add a pre-commit workflow.
 
 
 0.2.0_ - 2024-09-29
@@ -94,6 +103,7 @@ Added
 
 
 .. _Unreleased: https://github.com/akaihola/darkgray-dev-tools/compare/v0.3.0...HEAD
+.. _0.3.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.1...v0.2.0
 .. _0.1.1: https://github.com/akaihola/darkgray-dev-tools/compare/v0.1.0...v0.1.1
 .. _0.1.0: https://github.com/akaihola/darkgray-dev-tools/compare/v0.0.2...v0.1.0
