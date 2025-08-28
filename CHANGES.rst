@@ -9,6 +9,10 @@ Added
 Fixed
 -----
 
+Internal
+--------
+- Provide minimum versions for all dependencies in ``pyproject.toml``.
+
 
 0.3.0_ - 2025-08-25
 ===================
