@@ -9,7 +9,7 @@ dynamic = ["version", "description"]
 dependencies = [
     "airium>=0.2.6",
     "click>=8.0.0",
-    "keyring",
+    "keyring>=15",
     "pyproject-parser>=0.13.0b1",
     "requests_cache>=0.7",
     "ruamel.yaml>=0.15.78",
@@ -20,10 +20,10 @@ requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
-    "codespell",
-    "pre-commit",
-    "pre-commit-uv",
-    "pytest",
+    "codespell>=2.2.3",
+    "pre-commit>=2.5.1",
+    "pre-commit-uv>=3.6.2.1",
+    "pytest>=6.2.4",
     "pytest-kwparametrize>=0.0.3",
 ]
 
