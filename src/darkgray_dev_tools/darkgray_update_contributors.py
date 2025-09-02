@@ -33,6 +33,7 @@ from urllib.parse import urlencode, urljoin
 
 import click
 from airium import Airium
+from click.utils import echo
 from requests import codes
 from requests_cache.session import CachedSession
 from ruamel.yaml import YAML
@@ -325,10 +326,10 @@ def update(
     session = GitHubSession(token)
     users = join_github_users_with_contributions(users_and_contributions, session)
     doc = render_html(users, config)
-    click.echo(doc)
+    echo(doc)
     contributor_list = render_contributor_list(users)
     contributors_text = "\n".join(sorted(contributor_list, key=lambda s: s.lower()))
-    click.echo(contributors_text)
+    echo(contributors_text)
     if modify_readme:
         write_readme(doc)
     if modify_contributors:
@@ -442,7 +443,9 @@ def _normalize_rtl_override(text: str | None) -> str | None:
 
 
 DELETED_USERS: dict[str, GitHubUser] = {
-    "qubidt": {"id": 6306455, "name": "Bao", "login": "qubidt"},
+    "qubidt": {"id": 6306455, "name": "Bao", "login": "baodrate"},
+    "baod-rate": {"id": 6306455, "name": "Bao", "login": "baodrate"},
+    "wasdee": {"id": 8089231, "name": "Nutchanon (Ben) Ninyawee", "login": "ninyawee"},
 }
 
 
@@ -457,22 +460,21 @@ def join_github_users_with_contributions(
     :return: GitHub user info and the user's repository contributions merged together
 
     """
-    users: list[Contributor] = []
+    users: dict[int, Contributor] = {}
     for username, contributions in users_and_contributions.items():
         try:
             gh_user = cast(GitHubUser, session.get(f"/users/{username}").json())
         except GitHubApiNotFoundError:
             gh_user = DELETED_USERS[username]
         name = _normalize_rtl_override(gh_user["name"])
-        try:
-            contributor = Contributor(
-                gh_user["id"], name, gh_user["login"], contributions
+        user_id = gh_user["id"]
+
+        if user_id not in users:
+            users[user_id] = Contributor(
+                user_id, name, gh_user["login"], contributions=[]
             )
-        except KeyError:
-            click.echo(gh_user, err=True)
-            raise
-        users.append(contributor)
-    return users
+        users[user_id].contributions.extend(contributions)
+    return list(users.values())
 
 
 def make_rows(users: list[Contributor], columns: int) -> list[list[Contributor]]:
