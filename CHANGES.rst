@@ -5,6 +5,8 @@ These features will be included in the next release:
 
 Added
 -----
+- In ``darkgray_update_contributors``, prevent duplication of contributors
+  who renamed their GitHub account.
 
 Fixed
 -----
