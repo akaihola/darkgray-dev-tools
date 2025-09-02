@@ -17,6 +17,7 @@ import click
 import keyring
 import requests
 import ruamel.yaml
+from click.utils import echo
 
 from darkgray_dev_tools.darkgray_update_contributors import Contribution
 from darkgray_dev_tools.exceptions import GitHubRepoNameError
@@ -101,7 +102,7 @@ def collect_contributors(repo: str | None, since: str | None) -> None:
     collect_issues_and_prs(base_url, contributors, headers, since_date)
     collect_discussions(repo, contributors, headers, since_date)
 
-    click.echo("\n---\n\n")
+    echo("\n---\n\n")
     # write contributors to stdout as YAML
     contributors.dump()
 
@@ -151,7 +152,7 @@ class Contributors:
     ) -> None:
         """Add contribution type to contributors."""
         if login not in self._contributors:
-            click.echo(
+            echo(
                 f"  - {login}  "
                 f"# {role} for {endpoint[:-1]} #{object_num} "
                 f"(updated {updated_at[:10]})"
@@ -194,6 +195,18 @@ CONTRIBUTION_TYPES: dict[tuple[str, str], Contribution] = {
 }
 
 
+def is_bot(login: str) -> bool:
+    """Check if a user is a bot."""
+    return login == "github-actions" or login.endswith("[bot]")
+
+
+def since_str(since_date: str | None) -> str | None:
+    """Return a formatted since string for API requests."""
+    if since_date:
+        return f" since {since_date[:10]}"
+    return " since beginning of time"
+
+
 def collect_issues_and_prs(
     base_url: str,
     contributors: Contributors,
@@ -206,17 +219,18 @@ def collect_issues_and_prs(
         if since_date:
             url += f"&since={since_date}"
         while url:
-            click.echo(f"{endpoint} and their comments:")
+            echo(f"{endpoint} and their comments{since_str(since_date)}:")
             response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             if since_date and all(item["updated_at"] < since_date for item in data):
                 break
             for item in data:
+                login = item["user"]["login"]
                 number = item["number"]
-                if item["user"]["login"] != "github-actions":
+                if not is_bot(login):
                     contributors.add_contribution(
-                        item["user"]["login"],
+                        login,
                         endpoint,
                         "author",
                         number,
@@ -232,10 +246,11 @@ def collect_issues_and_prs(
                 comments_response.raise_for_status()
                 comments_data = comments_response.json()
                 for comment in comments_data:
-                    if comment["user"]["login"] == "github-actions":
+                    comment_login = comment["user"]["login"]
+                    if is_bot(comment_login):
                         continue
                     contributors.add_contribution(
-                        comment["user"]["login"],
+                        comment_login,
                         endpoint,
                         "commenter",
                         number,
@@ -287,7 +302,7 @@ def collect_discussions(
 
     has_next_page = True
     while has_next_page:
-        click.echo("discussions and their comments:")
+        echo(f"discussions and their comments{since_str(since_date)}:")
         response = requests.post(
             GITHUB_GRAPHQL_URL,
             headers=headers,
@@ -306,9 +321,10 @@ def collect_discussions(
                 has_next_page = False
                 break
 
-            if discussion["author"]["login"] != "github-actions":
+            login = discussion["author"]["login"]
+            if not is_bot(login):
                 contributors.add_contribution(
-                    discussion["author"]["login"],
+                    login,
                     "discussions",
                     "author",
                     discussion_number,
@@ -321,11 +337,12 @@ def collect_discussions(
                 if since_date and comment_updated_at < since_date:
                     continue
 
-                if comment["author"]["login"] == "github-actions":
+                comment_login = comment["author"]["login"]
+                if is_bot(comment_login):
                     continue
 
                 contributors.add_contribution(
-                    comment["author"]["login"],
+                    comment_login,
                     "discussions",
                     "commenter",
                     discussion_number,

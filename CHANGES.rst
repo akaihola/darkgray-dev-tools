@@ -5,9 +5,11 @@ These features will be included in the next release:
 
 Added
 -----
+- Show dates while processing history in ``darkgray_collect_contributors``.
 
 Fixed
 -----
+- Skip bot contributors in ``darkgray_collect_contributors``.
 
 Internal
 --------
